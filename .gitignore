@@ -1,0 +1,5 @@
+# Ignore build and virtual environment folders
+.buildozer/
+.venv/
+bin/
+.DS_Store

@@ -1,0 +1,7 @@
+opencv-python
+mediapipe
+kivy
+numpy
+torch
+pandas
+buildozer
