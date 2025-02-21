@@ -7,6 +7,7 @@ from kivy.uix.label import Label
 from kivy.uix.image import Image
 from kivy.clock import Clock
 from kivy.graphics.texture import Texture
+from kivy.core.window import Window
 import cv2
 import mediapipe as mp
 import numpy as np
@@ -34,6 +35,10 @@ class JointAngleTracker:
     def __init__(self, window_size=30):
         self.window_size = window_size
         self.joint_angles = {
+            'left_elbow': deque(maxlen=window_size),
+            'right_elbow': deque(maxlen=window_size),
+            'left_shoulder': deque(maxlen=window_size),
+            'right_shoulder': deque(maxlen=window_size),
             'left_knee': deque(maxlen=window_size),
             'right_knee': deque(maxlen=window_size),
             'left_hip': deque(maxlen=window_size),
@@ -108,7 +113,7 @@ class PoseEstimationApp(App):
         self.joint_tracker = JointAngleTracker()
         self.init_fatigue_model()
         
-        # Initialize camera
+        # Initialize camera and window
         self.capture = None
         self.event = None
         
@@ -116,23 +121,23 @@ class PoseEstimationApp(App):
     
     def init_fatigue_model(self):
         # Simple LSTM model for fatigue prediction
-        input_size = 18  # 6 joints * 3 features (mean, std, range)
+        input_size = 30  # 10 joints * 3 features (mean, std, range)
         hidden_size = 32
         num_layers = 2
         output_size = 1  # Fatigue score
         
         self.model = LSTM(input_size, hidden_size, num_layers, output_size)
-        # Note: In a real application, you would load pre-trained weights here
+        # Load pre-trained weights here
         self.model.eval()
     
-    def calculate_angle(self, a, b, c):
-        """Calculate angle between three points"""
-        a = np.array(a)
-        b = np.array(b)
-        c = np.array(c)
+    def calculate_angle(self, joint1, joint2, joint3):
+        # Calculate angle between three joints
+        a = np.array(joint1)
+        b = np.array(joint2)
+        c = np.array(joint3)
         
-        radians = np.arctan2(c[1]-b[1], c[0]-b[0]) - \
-                 np.arctan2(a[1]-b[1], a[0]-b[0])
+        radians = np.arctan2(joint3[1]-joint2[1], joint3[0]-joint2[0]) - \
+                 np.arctan2(joint1[1]-joint2[1], joint1[0]-joint2[0])
         angle = np.abs(radians*180.0/np.pi)
         
         if angle > 180.0:
@@ -147,18 +152,35 @@ class PoseEstimationApp(App):
         """Calculate all relevant joint angles"""
         mp_pose = self.mp_pose.PoseLandmark
         
-        # Left side joints
+        # Left side leg joints
         left_hip = self.get_joint_coordinates(landmarks, mp_pose.LEFT_HIP.value)
         left_knee = self.get_joint_coordinates(landmarks, mp_pose.LEFT_KNEE.value)
         left_ankle = self.get_joint_coordinates(landmarks, mp_pose.LEFT_ANKLE.value)
-        
-        # Right side joints
+
+        # Left side arm joints
+        left_shoulder = self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value)
+        left_elbow = self.get_joint_coordinates(landmarks, mp_pose.LEFT_ELBOW.value)
+        left_wrist = self.get_joint_coordinates(landmarks, mp_pose.LEFT_WRIST.value)
+
+        # Right side leg  joints
         right_hip = self.get_joint_coordinates(landmarks, mp_pose.RIGHT_HIP.value)
         right_knee = self.get_joint_coordinates(landmarks, mp_pose.RIGHT_KNEE.value)
         right_ankle = self.get_joint_coordinates(landmarks, mp_pose.RIGHT_ANKLE.value)
+
+        # Right side arm joints
+        right_shoulder = self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value)
+        right_elbow = self.get_joint_coordinates(landmarks, mp_pose.RIGHT_ELBOW.value)
+        right_wrist = self.get_joint_coordinates(landmarks, mp_pose.RIGHT_WRIST.value)
+
         
         # Calculate angles
         angles = {
+            # Upper
+            'left_elbow': self.calculate_angle(left_shoulder, left_elbow, left_wrist),
+            'right_elbow': self.calculate_angle(right_shoulder, right_elbow, right_wrist),
+            'left_shoulder': self.calculate_angle(left_elbow, left_shoulder, left_hip),
+            'right_shoulder': self.calculate_angle(right_elbow, right_shoulder, right_hip),
+            # Lower
             'left_knee': self.calculate_angle(left_hip, left_knee, left_ankle),
             'right_knee': self.calculate_angle(right_hip, right_knee, right_ankle),
             'left_hip': self.calculate_angle(
@@ -220,9 +242,9 @@ class PoseEstimationApp(App):
                 y_pos = 30
                 for joint, angle in angles.items():
                     cv2.putText(frame, f"{joint}: {angle:.1f}",
-                              (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.5,
-                              (255, 255, 255), 1)
-                    y_pos += 20
+                              (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 1,
+                              (0, 0, 0), 2)
+                    y_pos += 30
             
             # Convert frame to texture for Kivy
             buf = cv2.flip(frame, 0).tostring()
@@ -234,14 +256,14 @@ class PoseEstimationApp(App):
     
     def start_camera(self, instance):
         self.capture = cv2.VideoCapture(0)
-        self.event = Clock.schedule_interval(self.update, 1.0/30.0)  # 30 FPS
+        self.event = Clock.schedule_interval(self.update, 1.0/30.0) # set framerate to 30 FPS
     
     def stop_camera(self, instance):
         if self.event:
             self.event.cancel()
         if self.capture:
             self.capture.release()
-    
+
     def save_session_data(self, instance):
         if not os.path.exists('session_data'):
             os.makedirs('session_data')
