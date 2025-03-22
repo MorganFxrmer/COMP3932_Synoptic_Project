@@ -1,4 +1,4 @@
-from PoseEstimation import PoseEstimationApp
+from pose_estimation_app import PoseEstimationApp
 
 def main():
   PoseEstimationApp().run()
