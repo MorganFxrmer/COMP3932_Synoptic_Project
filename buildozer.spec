@@ -1,7 +1,7 @@
 [app]
 
 # (str) Title of your application
-title = Pose Estimation
+title = Pose Estimation App
 
 # (str) Package name
 package.name = PoseEstimationApp
@@ -10,7 +10,7 @@ package.name = PoseEstimationApp
 package.domain = org.test
 
 # (str) Source code where the main.py live
-source.dir = PoseEstimation.py
+source.dir = .
 
 # (list) Source files to include (let empty to include all the files)
 source.include_exts = py,png,jpg,kv,atlas,csv
@@ -37,7 +37,7 @@ version = 0.1
 
 # (list) Application requirements
 # comma separated e.g. requirements = sqlite3,kivy
-requirements = python3,kivy, opencv-python, mediapipe, numpy, torch, pandas, certifi, python-for-android
+requirements = python3,kivy, opencv-python, mediapipe, numpy, torch, pandas, certifi, python-for-android, typing-extensions
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes

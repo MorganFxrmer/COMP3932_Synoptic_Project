@@ -5,3 +5,5 @@ numpy
 torch
 pandas
 buildozer
+scikit-learn
+typing-extensions
