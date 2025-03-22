@@ -56,7 +56,6 @@ class FatigueDataProcessor:
     def extract_features(self, df):
         """Extract features from raw joint angles"""
         features = []
-        # Fix the joint list - there was a missing comma in your original code
         for joint in ['left_knee', 'right_knee', 'left_hip', 'right_hip', 'left_ankle', 'right_ankle', 
                       'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist']:
             if joint not in df.columns:
