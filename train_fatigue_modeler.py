@@ -106,7 +106,7 @@ class FatigueDataProcessor:
         return np.array(scaled_sequences), np.array(all_labels)
 
 class FatigueModelTrainer:
-    def __init__(self, model, learning_rate=0.001, batch_size=32):
+    def __init__(self, model, learning_rate=0.0001, batch_size=32):
         self.model = model
         self.learning_rate = learning_rate
         self.batch_size = batch_size
