@@ -237,11 +237,11 @@ def train_fatigue_model(data_dir, save_dir='models'):
         
     processor = FatigueDataProcessor()
     sequences, labels = processor.process_workout_data(data_dir)
+    print(f"Processed {len(sequences)} sequences from {len(os.listdir(data_dir))} files")
     
     train_seq, temp_seq, train_labels, temp_labels = train_test_split(
         sequences, labels, test_size=0.3, random_state=42
     )
-    
     val_seq, test_seq, val_labels, test_labels = train_test_split(
         temp_seq, temp_labels, test_size=0.5, random_state=42
     )
@@ -249,13 +249,22 @@ def train_fatigue_model(data_dir, save_dir='models'):
     input_feature_count = train_seq.shape[2]
     model = FatigueLSTM(
         input_size=input_feature_count,
-        hidden_size=64,
-        num_layers=2,
-        output_size=1
+        hidden_size=128,
+        num_layers=3,
+        output_size=1,
+        dropout=0.3
     )
     
-    trainer = FatigueModelTrainer(model)
-    history = trainer.train(train_seq, train_labels, val_seq, val_labels, epochs=100)
+    trainer = FatigueModelTrainer(model, learning_rate=0.0001)
+    history = trainer.train(train_seq, train_labels, val_seq, val_labels, epochs=100, early_stopping=20)
+    
+    plt.plot(history['train_loss'], label='Train Loss')
+    plt.plot(history['val_loss'], label='Val Loss')
+    plt.xlabel('Epoch')
+    plt.ylabel('Loss')
+    plt.legend()
+    plt.savefig('loss_plot.png')
+    plt.show()
     
     metrics, predictions, actual = trainer.evaluate(test_seq, test_labels)
     print("Model Evaluation Metrics:")
@@ -269,8 +278,8 @@ def train_fatigue_model(data_dir, save_dir='models'):
         'evaluation_metrics': metrics,
         'model_config': {
             'input_size': input_feature_count,
-            'hidden_size': 64,
-            'num_layers': 2
+            'hidden_size': 128,
+            'num_layers': 3
         }
     }
     
