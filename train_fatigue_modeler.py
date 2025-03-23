@@ -52,21 +52,23 @@ class FatigueDataProcessor:
         self.window_size = window_size
         self.overlap = overlap
         self.scaler = StandardScaler()
+        self.joints = [
+            'left_knee', 'right_knee', 'left_hip', 'right_hip', 'left_ankle', 'right_ankle',
+            'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist',
+            'neck', 'left_spine', 'right_spine', 'left_hip_torso', 'right_hip_torso',
+            'left_shoulder_torso', 'right_shoulder_torso'
+        ]
         
     def extract_features(self, df):
         """Extract features from raw joint angles"""
         features = []
-        for joint in ['left_knee', 'right_knee', 'left_hip', 'right_hip', 'left_ankle', 'right_ankle', 
-                      'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist']:
+        for joint in self.joints:
             if joint not in df.columns:
                 continue
-                
             joint_data = df[joint].values
             features.extend([
                 joint_data,
-                # Velocity of the joint
-                np.gradient(joint_data), 
-                # Acceleration of the joint
+                np.gradient(joint_data),
                 np.gradient(np.gradient(joint_data))
             ])
         return np.array(features).T
@@ -79,7 +81,6 @@ class FatigueDataProcessor:
         
         for i in range(0, len(features) - self.window_size + 1, step):
             sequences.append(features[i:i + self.window_size])
-            # Use the last label in the sequence as the target
             sequence_labels.append(labels[i + self.window_size - 1])
             
         return np.array(sequences), np.array(sequence_labels)
@@ -92,34 +93,17 @@ class FatigueDataProcessor:
         for filename in os.listdir(data_dir):
             if filename.endswith('.csv'):
                 df = pd.read_csv(os.path.join(data_dir, filename))
-                
-                # Extract features
                 features = self.extract_features(df)
-                
-                # Calculate fatigue labels (example based on joint variability)
-                # Replace with actual fatigue measurements if available
-                joint_variability = np.std(features, axis=1)
-                fatigue_labels = self.calculate_fatigue_labels(joint_variability)
-                
-                # Create sequences
+                fatigue_labels = df['fatigue_label'].values / 10.0
                 sequences, labels = self.create_sequences(features, fatigue_labels)
-                
                 all_sequences.extend(sequences)
                 all_labels.extend(labels)
         
-        # Scale features
         shaped_sequences = np.vstack(all_sequences)
         self.scaler.fit(shaped_sequences)
         scaled_sequences = [self.scaler.transform(seq) for seq in all_sequences]
         
         return np.array(scaled_sequences), np.array(all_labels)
-    
-    def calculate_fatigue_labels(self, joint_variability):
-        """Calculate fatigue labels based on joint movement patterns"""
-        # This is a simplified example - in practice, you'd want to use actual fatigue measurements
-        normalized_variability = joint_variability / np.max(joint_variability)
-        smoothed_fatigue = np.convolve(normalized_variability, np.ones(10)/10, mode='same')
-        return np.clip(smoothed_fatigue, 0, 1)
 
 class FatigueModelTrainer:
     def __init__(self, model, learning_rate=0.001, batch_size=32):
@@ -130,19 +114,15 @@ class FatigueModelTrainer:
         self.model.to(self.device)
         
     def train(self, train_sequences, train_labels, val_sequences, val_labels, epochs=100, early_stopping=10):
-        """Train the fatigue prediction model with early stopping"""
-        # Create data loaders
         train_dataset = WorkoutDataset(train_sequences, train_labels)
         val_dataset = WorkoutDataset(val_sequences, val_labels)
         
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         val_loader = DataLoader(val_dataset, batch_size=self.batch_size)
         
-        # Initialize optimiser and loss function
         optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate)
         criterion = nn.MSELoss()
         
-        # Training history
         history = {
             'train_loss': [],
             'val_loss': [],
@@ -151,22 +131,18 @@ class FatigueModelTrainer:
         }
         
         for epoch in range(epochs):
-            # Training
             self.model.train()
             train_loss = 0
             for sequences, labels in train_loader:
                 sequences = sequences.to(self.device)
                 labels = labels.to(self.device)
-                
                 optimizer.zero_grad()
                 outputs = self.model(sequences)
                 loss = criterion(outputs, labels.unsqueeze(1))
                 loss.backward()
                 optimizer.step()
-                
                 train_loss += loss.item()
             
-            # Validation
             self.model.eval()
             val_loss = 0
             with torch.no_grad():
@@ -176,29 +152,24 @@ class FatigueModelTrainer:
                     outputs = self.model(sequences)
                     val_loss += criterion(outputs, labels.unsqueeze(1)).item()
             
-            # Calculate average losses
             avg_train_loss = train_loss / len(train_loader)
             avg_val_loss = val_loss / len(val_loader)
             
-            # Update history
-            history['train_loss'].append(avg_train_loss)
-            history['val_loss'].append(avg_val_loss)
+            history['train_loss'].append(float(avg_train_loss))  # Convert to Python float
+            history['val_loss'].append(float(avg_val_loss))      # Convert to Python float
             
-            # Early stopping logic
             if avg_val_loss < history['best_val_loss']:
-                history['best_val_loss'] = avg_val_loss
+                history['best_val_loss'] = float(avg_val_loss)   # Convert to Python float
                 history['epochs_no_improve'] = 0
                 self.save_model('best_model.pt')
             else:
                 history['epochs_no_improve'] += 1
                 
-            # Print progress
             if (epoch + 1) % 10 == 0:
                 print(f'Epoch [{epoch+1}/{epochs}], '
                       f'Train Loss: {avg_train_loss:.4f}, '
                       f'Val Loss: {avg_val_loss:.4f}')
                 
-            # Check early stopping
             if history['epochs_no_improve'] >= early_stopping:
                 print(f'Early stopping at epoch {epoch+1}')
                 break
@@ -206,7 +177,6 @@ class FatigueModelTrainer:
         return history
     
     def evaluate(self, test_sequences, test_labels):
-        """Evaluate model performance on test data"""
         self.model.eval()
         test_dataset = WorkoutDataset(test_sequences, test_labels)
         test_loader = DataLoader(test_dataset, batch_size=self.batch_size)
@@ -221,15 +191,13 @@ class FatigueModelTrainer:
                 all_preds.extend(outputs.cpu().numpy().flatten())
                 all_labels.extend(labels.numpy().flatten())
         
-        # Calculate metrics
         metrics = {
-            'mse': mean_squared_error(all_labels, all_preds),
-            'rmse': np.sqrt(mean_squared_error(all_labels, all_preds)),
-            'mae': mean_absolute_error(all_labels, all_preds),
-            'r2': r2_score(all_labels, all_preds)
+            'mse': float(mean_squared_error(all_labels, all_preds)),   # Convert to Python float
+            'rmse': float(np.sqrt(mean_squared_error(all_labels, all_preds))),
+            'mae': float(mean_absolute_error(all_labels, all_preds)),
+            'r2': float(r2_score(all_labels, all_preds))
         }
         
-        # Plot actual vs predicted
         plt.figure(figsize=(10, 6))
         plt.scatter(all_labels, all_preds, alpha=0.5)
         plt.plot([0, 1], [0, 1], 'r--')
@@ -241,7 +209,6 @@ class FatigueModelTrainer:
         return metrics, all_preds, all_labels
     
     def save_model(self, filename):
-        """Save the model with the training parameters"""
         model_info = {
             'state_dict': self.model.state_dict(),
             'input_size': self.model.lstm.input_size,
@@ -252,16 +219,11 @@ class FatigueModelTrainer:
         torch.save(model_info, filename)
         
     def export_to_mobile(self, filename='mobile_model.pt'):
-        """Export the model for mobile deployment"""
-        # Trace the model with example input
         example_input = torch.randn(1, self.model.get_input_size()).unsqueeze(0)
         traced_model = torch.jit.trace(self.model, example_input)
-        
-        # Save the traced model
         torch.jit.save(traced_model, filename)
         print(f"Model exported for mobile deployment at {filename}")
         
-        # Export quantized model for even smaller size and faster inference
         quantized_model = torch.quantization.quantize_dynamic(
             self.model, {nn.LSTM, nn.Linear}, dtype=torch.qint8
         )
@@ -270,18 +232,12 @@ class FatigueModelTrainer:
         print(f"Quantized model exported at quantized_{filename}")
 
 def train_fatigue_model(data_dir, save_dir='models'):
-    """Main training function with evaluation"""
-    # Create save directory if it doesn't exist
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
         
-    # Initialize data processor
     processor = FatigueDataProcessor()
-    
-    # Process workout data
     sequences, labels = processor.process_workout_data(data_dir)
     
-    # Split the data into training, validation, and test
     train_seq, temp_seq, train_labels, temp_labels = train_test_split(
         sequences, labels, test_size=0.3, random_state=42
     )
@@ -290,7 +246,6 @@ def train_fatigue_model(data_dir, save_dir='models'):
         temp_seq, temp_labels, test_size=0.5, random_state=42
     )
     
-    # Initialize model
     input_feature_count = train_seq.shape[2]
     model = FatigueLSTM(
         input_size=input_feature_count,
@@ -299,22 +254,16 @@ def train_fatigue_model(data_dir, save_dir='models'):
         output_size=1
     )
     
-    # Initialize trainer
     trainer = FatigueModelTrainer(model)
-    
-    # Train model
     history = trainer.train(train_seq, train_labels, val_seq, val_labels, epochs=100)
     
-    # Evaluate model
     metrics, predictions, actual = trainer.evaluate(test_seq, test_labels)
     print("Model Evaluation Metrics:")
     for metric, value in metrics.items():
         print(f"{metric.upper()}: {value:.4f}")
     
-    # Export model for mobile
     trainer.export_to_mobile()
     
-    # Save training history and evaluation results
     results = {
         'training_history': history,
         'evaluation_metrics': metrics,
@@ -328,12 +277,10 @@ def train_fatigue_model(data_dir, save_dir='models'):
     with open(os.path.join(save_dir, 'model_results.json'), 'w') as f:
         json.dump(results, f, indent=4)
     
-    # Save scaler
     torch.save(processor.scaler, os.path.join(save_dir, 'scaler.pt'))
     
     print("Training and evaluation completed. Model and artifacts saved in", save_dir)
     return trainer, processor, metrics
 
 if __name__ == '__main__':
-    # Example usage
     train_fatigue_model('session_data')
