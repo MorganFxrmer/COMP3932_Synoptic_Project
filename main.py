@@ -1,7 +1,7 @@
-from pose_estimation_app import PoseEstimationApp
+from run_pose_estimation import RunPoseEstimationApp
 
 def main():
-  PoseEstimationApp().run()
+  RunPoseEstimationApp().run()
 
 if __name__ == '__main__':
     main()

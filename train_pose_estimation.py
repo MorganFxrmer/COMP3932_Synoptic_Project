@@ -16,25 +16,40 @@ from kivy.graphics.texture import Texture
 
 class JointAngleTracker:
     def __init__(self):
-        self.joints = ['left_knee', 'right_knee', 'left_hip', 'right_hip', 'left_ankle', 'right_ankle', 
-                       'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow']
-        # Use lists instead of deques to store all data
+        self.joints = [
+            'left_knee', 'right_knee', 'left_hip', 'right_hip', 'left_ankle', 'right_ankle',
+            'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow',
+            'left_wrist', 'right_wrist', 'neck', 'left_spine', 'right_spine',
+            'left_hip_torso', 'right_hip_torso', 'left_shoulder_torso', 'right_shoulder_torso'
+        ]
         self.joint_angles = {joint: [] for joint in self.joints}
         self.timestamps = []
         self.fatigue_labels = []
+        self.dropped_frames = 0
     
-    def update(self, angles_dict, fatigue_label=None):
+    def update(self, angles_dict, fatigue_label=None, detected=True):
         timestamp = datetime.now()
         self.timestamps.append(timestamp)
-        for joint in self.joints:
-            self.joint_angles[joint].append(angles_dict.get(joint, 0.0))
+        if detected and angles_dict:
+            for joint in self.joints:
+                angle = angles_dict.get(joint, 0.0)
+                if 0 <= angle <= 180:
+                    self.joint_angles[joint].append(angle)
+                else:
+                    self.joint_angles[joint].append(0.0)
+        else:
+            for joint in self.joints:
+                self.joint_angles[joint].append(0.0)
+            self.dropped_frames += 1
         self.fatigue_labels.append(fatigue_label if fatigue_label is not None else 0.0)
     
     def save_data(self, filename):
         data = {'timestamp': self.timestamps, 'fatigue_label': self.fatigue_labels}
         data.update({joint: angles for joint, angles in self.joint_angles.items()})
-        pd.DataFrame(data).to_csv(filename, index=False)
-        print(f"Saved {len(self.timestamps)} frames to {filename}")
+        df = pd.DataFrame(data)
+        df.to_csv(filename, index=False)
+        total_frames = len(self.timestamps)
+        print(f"Saved {total_frames} frames to {filename} (Dropped: {self.dropped_frames}, {self.dropped_frames/total_frames*100:.1f}%)")
 
 class TrainPoseEstimationApp(App):
     def build(self):
@@ -84,58 +99,109 @@ class TrainPoseEstimationApp(App):
     
     def calculate_joint_angles(self, landmarks):
         mp_pose = self.mp_pose.PoseLandmark
-        angles = {
-            'left_elbow': self.calculate_angle(
-                self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value),
-                self.get_joint_coordinates(landmarks, mp_pose.LEFT_ELBOW.value),
-                self.get_joint_coordinates(landmarks, mp_pose.LEFT_WRIST.value)
-            ),
-            'right_elbow': self.calculate_angle(
-                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value),
-                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_ELBOW.value),
-                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_WRIST.value)
-            ),
-            'left_shoulder': self.calculate_angle(
-                self.get_joint_coordinates(landmarks, mp_pose.LEFT_ELBOW.value),
-                self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value),
-                self.get_joint_coordinates(landmarks, mp_pose.LEFT_HIP.value)
-            ),
-            'right_shoulder': self.calculate_angle(
-                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_ELBOW.value),
-                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value),
-                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_HIP.value)
-            ),
-            'left_knee': self.calculate_angle(
-                self.get_joint_coordinates(landmarks, mp_pose.LEFT_HIP.value),
-                self.get_joint_coordinates(landmarks, mp_pose.LEFT_KNEE.value),
-                self.get_joint_coordinates(landmarks, mp_pose.LEFT_ANKLE.value)
-            ),
-            'right_knee': self.calculate_angle(
-                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_HIP.value),
-                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_KNEE.value),
-                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_ANKLE.value)
-            ),
-            'left_hip': self.calculate_angle(
-                self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value),
-                self.get_joint_coordinates(landmarks, mp_pose.LEFT_HIP.value),
-                self.get_joint_coordinates(landmarks, mp_pose.LEFT_KNEE.value)
-            ),
-            'right_hip': self.calculate_angle(
-                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value),
-                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_HIP.value),
-                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_KNEE.value)
-            ),
-            'left_ankle': self.calculate_angle(
-                self.get_joint_coordinates(landmarks, mp_pose.LEFT_KNEE.value),
-                self.get_joint_coordinates(landmarks, mp_pose.LEFT_ANKLE.value),
-                self.get_joint_coordinates(landmarks, mp_pose.LEFT_FOOT_INDEX.value)
-            ),
-            'right_ankle': self.calculate_angle(
-                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_KNEE.value),
-                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_ANKLE.value),
-                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_FOOT_INDEX.value)
-            )
-        }
+        angles = {}
+        try:
+            angles = {
+                # Original 10 joints
+                'left_elbow': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_ELBOW.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_WRIST.value)
+                ),
+                'right_elbow': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_ELBOW.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_WRIST.value)
+                ),
+                'left_shoulder': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_ELBOW.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_HIP.value)
+                ),
+                'right_shoulder': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_ELBOW.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_HIP.value)
+                ),
+                'left_knee': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_HIP.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_KNEE.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_ANKLE.value)
+                ),
+                'right_knee': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_HIP.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_KNEE.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_ANKLE.value)
+                ),
+                'left_hip': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_HIP.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_KNEE.value)
+                ),
+                'right_hip': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_HIP.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_KNEE.value)
+                ),
+                'left_ankle': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_KNEE.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_ANKLE.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_FOOT_INDEX.value)
+                ),
+                'right_ankle': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_KNEE.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_ANKLE.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_FOOT_INDEX.value)
+                ),
+                # Additional joints
+                'left_wrist': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_ELBOW.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_WRIST.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_INDEX.value)
+                ),
+                'right_wrist': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_ELBOW.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_WRIST.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_INDEX.value)
+                ),
+                'neck': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.NOSE.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value)
+                ),
+                'left_spine': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_HIP.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_HIP.value)
+                ),
+                'right_spine': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_HIP.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_HIP.value)
+                ),
+                'left_hip_torso': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_HIP.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value)
+                ),
+                'right_hip_torso': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_HIP.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value)
+                ),
+                'left_shoulder_torso': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_ELBOW.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value)
+                ),
+                'right_shoulder_torso': self.calculate_angle(
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_ELBOW.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value),
+                    self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value)
+                )
+            }
+        except AttributeError:
+            return None
         return angles
     
     def submit_fatigue(self, instance):
@@ -162,14 +228,21 @@ class TrainPoseEstimationApp(App):
             results = self.pose.process(frame_rgb)
             
             if results.pose_landmarks:
-                self.mp_draw.draw_landmarks(frame, results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS)
                 angles = self.calculate_joint_angles(results.pose_landmarks.landmark)
-                self.joint_tracker.update(angles, self.current_fatigue if hasattr(self, 'current_fatigue') else None)
-                
-                y_pos = 30
-                for joint, angle in angles.items():
-                    cv2.putText(frame, f"{joint}: {angle:.1f}", (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-                    y_pos += 20
+                if angles:
+                    self.mp_draw.draw_landmarks(frame, results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS)
+                    self.joint_tracker.update(angles, self.current_fatigue if hasattr(self, 'current_fatigue') else None, detected=True)
+                    
+                    y_pos = 30
+                    for joint, angle in angles.items():
+                        cv2.putText(frame, f"{joint}: {angle:.1f}", (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                        y_pos += 20
+                else:
+                    self.joint_tracker.update(None, self.current_fatigue if hasattr(self, 'current_fatigue') else None, detected=False)
+                    cv2.putText(frame, "Partial Detection Failed", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+            else:
+                self.joint_tracker.update(None, self.current_fatigue if hasattr(self, 'current_fatigue') else None, detected=False)
+                cv2.putText(frame, "No Pose Detected", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
             
             buf = cv2.flip(frame, 0).tobytes()
             texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
