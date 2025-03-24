@@ -1,0 +1,42 @@
+program: train_fatigue_modeler.py
+method: bayes  # Bayesian optimization for efficient search
+metric:
+  name: val_loss
+  goal: minimize
+early_terminate:
+  type: hyperband
+  min_iter: 10  # Stop runs early if they perform poorly after 10 epochs
+parameters:
+  # Training Hyperparameters
+  learning_rate:
+    values: [0.01, 0.005, 0.001, 0.0005, 0.0001, 0.00005, 0.00001]  # Wide range to explore
+  batch_size:
+    values: [8, 16, 32, 64, 128]  # From small (noisy gradients) to large (stable gradients)
+  epochs:
+    values: [100, 150, 200]  # Test longer training if beneficial
+  early_stopping:
+    values: [10, 20, 30]  # Patience for stopping, balancing overfitting and underfitting
+  weight_decay:
+    min: 1e-6  # L2 regularization, from light to strong
+    max: 1e-2
+    distribution: log_uniform_values  # Log scale for finer control
+
+  # Model Hyperparameters
+  hidden_size:
+    values: [32, 64, 128, 256]  # Test smaller and larger hidden states
+  num_layers:
+    values: [1, 2, 3, 4]  # From shallow to deeper LSTMs
+  dropout:
+    min: 0.2  # Dropout range to control overfitting
+    max: 0.7
+    distribution: uniform
+
+  # Data Processing Hyperparameters
+  window_size:
+    values: [10, 20, 30, 40, 50]  # Vary sequence length for temporal context
+  overlap:
+    min: 0.3  # Overlap range for sequence generation
+    max: 0.9
+    distribution: uniform
+
+description: "Extensive hyperparameter sweep for FatigueLSTM model optimization"
