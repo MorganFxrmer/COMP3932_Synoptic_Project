@@ -1,0 +1,31 @@
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Bicep Curls\bicep_curl_1.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Bicep Curls\bicep_curl_2.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Calf Raises\calf_raises.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Chest Fly\chest_fly_1.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Chest Fly\chest_fly_2.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Deadlift\deadlift.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Incline Chest Press\incline_chest_press_1.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Incline Chest Press\incline_chest_press_2.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Incline DB Press\incline_db_press_1.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Incline DB Press\incline_db_press_2.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Incline DB Press\incline_db_press_3.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Lat Pulldown\lat_pulldown_1.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Lat Pulldown\lat_pulldown_2.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Lat Pulldown\lat_pulldown_3.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Lateral Raise\lateral_raise_1.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Lateral Raise\lateral_raise_2.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Tricep Dips\tricep_dips.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Tricep Extension\tricep_extension_1.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Tricep Extension\tricep_extension_2.mp4
+
+
+Validation Testing
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Tricep Extension\tricep_extension_3.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Tricep Extension\tricep_extension_4.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Lateral Raise\lateral_raise_3.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Incline DB Press\incline_db_press_4.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Lat Pulldown\lat_pulldown_4.mp4
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Lat Pulldown\lat_pulldown_5.mp4
+
+Axe
+C:\Users\morga\Documents\University\Year 3\Dissertation\Code\Training Videos\Crunches\crunches.mp4
