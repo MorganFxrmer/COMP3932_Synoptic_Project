@@ -31,8 +31,12 @@ class FatigueLSTM(nn.Module):
 class JointAngleTracker:
     def __init__(self, window_size=30):
         self.window_size = window_size
-        self.joints = ['left_knee', 'right_knee', 'left_hip', 'right_hip', 'left_ankle', 'right_ankle', 
-                       'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow']
+        self.joints = [
+            'left_knee', 'right_knee', 'left_hip', 'right_hip', 'left_ankle', 'right_ankle',
+            'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist',
+            'neck', 'left_spine', 'right_spine', 'left_hip_torso', 'right_hip_torso',
+            'left_shoulder_torso', 'right_shoulder_torso'
+        ]
         self.joint_angles = {joint: deque(maxlen=window_size) for joint in self.joints}
     
     def update(self, angles_dict):
@@ -47,16 +51,13 @@ class JointAngleTracker:
             angles = np.array(self.joint_angles[joint])
             velocity = np.gradient(angles)
             acceleration = np.gradient(velocity)
-            features.extend([angles, velocity, acceleration, angles - np.mean(angles)])
-        for left, right in [('left_knee', 'right_knee'), ('left_hip', 'right_hip'), 
-                           ('left_shoulder', 'right_shoulder'), ('left_elbow', 'right_elbow')]:
-            symmetry = np.array(self.joint_angles[left]) - np.array(self.joint_angles[right])
-            features.append(symmetry)
+            features.extend([angles, velocity, acceleration])
         return np.array(features).T
     
     def get_form_feedback(self):
         feedback = []
-        for left, right in [('left_knee', 'right_knee'), ('left_hip', 'right_hip')]:
+        for left, right in [('left_knee', 'right_knee'), ('left_hip', 'right_hip'),
+                            ('left_shoulder', 'right_shoulder'), ('left_elbow', 'right_elbow')]:
             diff = np.mean(np.abs(np.array(self.joint_angles[left]) - np.array(self.joint_angles[right])))
             if diff > 20:
                 feedback.append(f"Adjust {left.replace('_', ' ')} and {right.replace('_', ' ')} for symmetry")
@@ -87,7 +88,6 @@ class RunPoseEstimationApp(App):
         self.mp_draw = mp.solutions.drawing_utils
         self.joint_tracker = JointAngleTracker()
         
-        # Load trained model and scaler
         if os.path.exists('models/best_model.pt') and os.path.exists('models/scaler.pt'):
             model_info = torch.load('models/best_model.pt', map_location='cpu')
             self.model = FatigueLSTM(
@@ -168,6 +168,51 @@ class RunPoseEstimationApp(App):
                 self.get_joint_coordinates(landmarks, mp_pose.RIGHT_KNEE.value),
                 self.get_joint_coordinates(landmarks, mp_pose.RIGHT_ANKLE.value),
                 self.get_joint_coordinates(landmarks, mp_pose.RIGHT_FOOT_INDEX.value)
+            ),
+            'left_wrist': self.calculate_angle(
+                self.get_joint_coordinates(landmarks, mp_pose.LEFT_ELBOW.value),
+                self.get_joint_coordinates(landmarks, mp_pose.LEFT_WRIST.value),
+                self.get_joint_coordinates(landmarks, mp_pose.LEFT_INDEX.value)
+            ),
+            'right_wrist': self.calculate_angle(
+                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_ELBOW.value),
+                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_WRIST.value),
+                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_INDEX.value)
+            ),
+            'neck': self.calculate_angle(
+                self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value),
+                self.get_joint_coordinates(landmarks, mp_pose.NOSE.value),
+                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value)
+            ),
+            'left_spine': self.calculate_angle(
+                self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value),
+                self.get_joint_coordinates(landmarks, mp_pose.LEFT_HIP.value),
+                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_HIP.value)
+            ),
+            'right_spine': self.calculate_angle(
+                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value),
+                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_HIP.value),
+                self.get_joint_coordinates(landmarks, mp_pose.LEFT_HIP.value)
+            ),
+            'left_hip_torso': self.calculate_angle(
+                self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value),
+                self.get_joint_coordinates(landmarks, mp_pose.LEFT_HIP.value),
+                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value)
+            ),
+            'right_hip_torso': self.calculate_angle(
+                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value),
+                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_HIP.value),
+                self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value)
+            ),
+            'left_shoulder_torso': self.calculate_angle(
+                self.get_joint_coordinates(landmarks, mp_pose.LEFT_ELBOW.value),
+                self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value),
+                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value)
+            ),
+            'right_shoulder_torso': self.calculate_angle(
+                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_ELBOW.value),
+                self.get_joint_coordinates(landmarks, mp_pose.RIGHT_SHOULDER.value),
+                self.get_joint_coordinates(landmarks, mp_pose.LEFT_SHOULDER.value)
             )
         }
         return angles
