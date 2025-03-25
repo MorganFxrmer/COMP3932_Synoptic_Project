@@ -52,16 +52,42 @@ class JointAngleTracker:
             velocity = np.gradient(angles)
             acceleration = np.gradient(velocity)
             features.extend([angles, velocity, acceleration])
-        return np.array(features).T
+        symmetry_pairs = [
+            ('left_knee', 'right_knee'),
+            ('left_hip', 'right_hip'),
+            ('left_elbow', 'right_elbow')
+        ]
+        for left, right in symmetry_pairs:
+            symmetry = np.array(self.joint_angles[left]) - np.array(self.joint_angles[right])
+            features.append(symmetry)
+        return np.array(features).T  # Shape: (window_size, 60)
     
-    def get_form_feedback(self):
+    def get_form_feedback(self, fatigue_score=None):
         feedback = []
         for left, right in [('left_knee', 'right_knee'), ('left_hip', 'right_hip'),
                             ('left_shoulder', 'right_shoulder'), ('left_elbow', 'right_elbow')]:
             diff = np.mean(np.abs(np.array(self.joint_angles[left]) - np.array(self.joint_angles[right])))
             if diff > 20:
                 feedback.append(f"Adjust {left.replace('_', ' ')} and {right.replace('_', ' ')} for symmetry")
-        return feedback
+        if np.mean(self.joint_angles['left_knee']) < 90 or np.mean(self.joint_angles['right_knee']) < 90:
+            feedback.append("Keep knees outward; avoid collapsing inward")
+        spine_avg = (np.mean(self.joint_angles['left_spine']) + np.mean(self.joint_angles['right_spine'])) / 2
+        if spine_avg < 150:
+            feedback.append("Straighten your back; avoid rounding")
+        if np.mean(self.joint_angles['left_hip']) < 90 or np.mean(self.joint_angles['right_hip']) < 90:
+            feedback.append("Push hips back more; maintain depth without excessive lean")
+        features = self.get_features()
+        if features is not None:
+            velocities = features[:, 19:38]
+            avg_velocity = np.mean(np.abs(velocities[-5:]))
+            if avg_velocity < 5:
+                feedback.append("Movement slowing; focus on form or rest")
+        if fatigue_score is not None:
+            if fatigue_score > 0.7:
+                feedback.append("High fatigue detected; consider reducing weight or taking a break")
+            elif fatigue_score > 0.5:
+                feedback.append("Moderate fatigue; maintain strict form to avoid injury")
+        return feedback if feedback else ["Form looks good; keep it up!"]
 
 class RunPoseEstimationApp(App):
     def build(self):
@@ -69,11 +95,13 @@ class RunPoseEstimationApp(App):
         self.image = Image()
         self.layout.add_widget(self.image)
         
-        self.feedback_layout = BoxLayout(orientation='vertical', size_hint_y=0.3)
+        self.feedback_layout = BoxLayout(orientation='vertical', size_hint_y=0.4)
         self.fatigue_label = Label(text='Fatigue Status: Monitoring...')
-        self.form_label = Label(text='Form Feedback: None')
+        self.form_label = Label(text='Form Feedback: None', size_hint_y=0.3)
+        self.trainer_label = Label(text='Trainer Advice: None', size_hint_y=0.3)
         self.feedback_layout.add_widget(self.fatigue_label)
         self.feedback_layout.add_widget(self.form_label)
+        self.feedback_layout.add_widget(self.trainer_label)
         self.layout.add_widget(self.feedback_layout)
         
         self.button_layout = BoxLayout(size_hint_y=0.1)
@@ -89,7 +117,7 @@ class RunPoseEstimationApp(App):
         self.joint_tracker = JointAngleTracker()
         
         if os.path.exists('models/best_model.pt') and os.path.exists('models/scaler.pt'):
-            model_info = torch.load('models/best_model.pt', map_location='cpu')
+            model_info = torch.load('models/best_model.pt', map_location='cpu', weights_only=False)
             self.model = FatigueLSTM(
                 input_size=model_info['input_size'], 
                 hidden_size=model_info['hidden_size'], 
@@ -98,7 +126,8 @@ class RunPoseEstimationApp(App):
             )
             self.model.load_state_dict(model_info['state_dict'])
             self.model.eval()
-            self.scaler = torch.load('models/scaler.pt')
+            # Load scaler with weights_only=False to allow full object deserialization
+            self.scaler = torch.load('models/scaler.pt', weights_only=False, map_location='cpu')
             print("Model and scaler loaded successfully")
         else:
             raise FileNotFoundError("Trained model or scaler not found in 'models/' directory")
@@ -237,13 +266,18 @@ class RunPoseEstimationApp(App):
                 self.joint_tracker.update(angles)
                 
                 features = self.joint_tracker.get_features()
+                fatigue_score = None
                 if features is not None:
                     fatigue_score = self.predict_fatigue(features)
                     status = "Low" if fatigue_score < 0.3 else "Medium" if fatigue_score < 0.7 else "High"
                     self.fatigue_label.text = f'Fatigue Status: {status} ({fatigue_score:.2f})'
                 
-                form_feedback = self.joint_tracker.get_form_feedback()
-                self.form_label.text = 'Form Feedback: ' + ('None' if not form_feedback else '; '.join(form_feedback))
+                form_feedback = self.joint_tracker.get_form_feedback(fatigue_score)
+                posture_feedback = [f for f in form_feedback if "fatigue" not in f.lower()]
+                trainer_advice = [f for f in form_feedback if "fatigue" in f.lower()]
+                
+                self.form_label.text = 'Form Feedback: ' + ('None' if not posture_feedback else '; '.join(posture_feedback))
+                self.trainer_label.text = 'Trainer Advice: ' + ('None' if not trainer_advice else '; '.join(trainer_advice))
                 
                 y_pos = 30
                 for joint, angle in angles.items():
