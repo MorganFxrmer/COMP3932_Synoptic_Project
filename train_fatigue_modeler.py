@@ -59,31 +59,39 @@ class FatigueDataProcessor:
         sequences, sequence_labels = [], []
         for i in range(0, len(features) - self.window_size + 1, step):
             window = features[i:i + self.window_size]
-            np.random.shuffle(window)
             sequences.append(window)
             sequence_labels.append(labels[i + self.window_size - 1])
         return np.array(sequences), np.array(sequence_labels)
     
     def process_workout_data(self, data_dir):
-        all_sequences = []
-        all_labels = []
+        all_features, all_labels = [], []
         for filename in os.listdir(data_dir):
             if filename.endswith('.csv'):
                 df = pd.read_csv(os.path.join(data_dir, filename))
                 features = self.extract_features(df)
                 fatigue_labels = df['fatigue_label'].values / 10.0
-                sequences, labels = self.create_sequences(features, fatigue_labels)
-                all_sequences.extend(sequences)
-                all_labels.extend(labels)
+                all_features.append(features)
+                all_labels.append(fatigue_labels)
         
-        hist, bins = np.histogram(all_labels, bins=10, range=(0, 1))
+        all_features = np.concatenate(all_features)
+        all_labels = np.concatenate(all_labels)
+        sequences, labels = self.create_sequences(all_features, all_labels)
+        
+        train_seq, temp_seq, train_labels, temp_labels = train_test_split(
+            sequences, labels, test_size=0.3, random_state=42
+        )
+        val_seq, test_seq, val_labels, test_labels = train_test_split(
+            temp_seq, temp_labels, test_size=0.5, random_state=42
+        )
+
+        hist, bins = np.histogram(labels, bins=10, range=(0, 1))
         print("Histogram of fatigue labels (0-1 scale):")
         print(f"Counts: {hist}")
         print(f"Bin edges: {bins}")
         wandb.log({"Fatigue Label Distribution": wandb.Histogram(np_histogram=(hist, bins))})
         
-        print(f"Processed {len(all_sequences)} sequences from {len(os.listdir(data_dir))} files")
-        return np.array(all_sequences), np.array(all_labels)
+        print(f"Processed {len(sequences)} sequences from {len(os.listdir(data_dir))} files")
+        return train_seq, train_labels, val_seq, val_labels, test_seq, test_labels
 
 class FatigueModelTrainer:
     def __init__(self, model, learning_rate, batch_size, weight_decay):
@@ -108,6 +116,7 @@ class FatigueModelTrainer:
         criterion = nn.MSELoss()
         best_val_loss = float('inf')
         epochs_no_improve = 0
+        tolerance = 1e-4
 
         for epoch in range(epochs):
             self.model.train()
@@ -132,10 +141,10 @@ class FatigueModelTrainer:
             avg_train_loss = train_loss / len(train_loader)
             avg_val_loss = val_loss / len(val_loader)
 
+            # Log every epoch
             wandb.log({"epoch": epoch, "train_loss": avg_train_loss, "val_loss": avg_val_loss})
 
-            # Improved early stopping logic
-            if avg_val_loss < best_val_loss:
+            if avg_val_loss < best_val_loss - tolerance:
                 best_val_loss = avg_val_loss
                 epochs_no_improve = 0
                 self.save_model('best_model.pt')
@@ -144,7 +153,8 @@ class FatigueModelTrainer:
                 epochs_no_improve += 1
 
             if (epoch + 1) % 10 == 0:
-                print(f'Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}, Epochs No Improve: {epochs_no_improve}')
+                print(f'Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}, '
+                      f'Epochs No Improve: {epochs_no_improve}, Best Val Loss: {best_val_loss:.6f}')
 
             if epochs_no_improve >= early_stopping:
                 print(f'Early stopping triggered after epoch {epoch+1} with patience {early_stopping}')
@@ -166,6 +176,8 @@ class FatigueModelTrainer:
                 all_preds.extend(outputs.cpu().numpy().flatten())
                 all_labels.extend(labels.numpy().flatten())
 
+        all_preds = np.clip(all_preds, 0, 1)
+
         metrics = {
             'mse': float(mean_squared_error(all_labels, all_preds)),
             'rmse': float(np.sqrt(mean_squared_error(all_labels, all_preds))),
@@ -173,24 +185,25 @@ class FatigueModelTrainer:
             'r2': float(r2_score(all_labels, all_preds))
         }
 
+        baseline_preds = np.roll(test_labels, 1)
+        baseline_preds[0] = test_labels[0]
+        baseline_r2 = float(r2_score(test_labels, baseline_preds))
+
+        # Log all metrics
         wandb.run.summary.update(metrics)
+        wandb.run.summary["baseline_r2"] = baseline_r2
         wandb.log({"Pred vs Actual": wandb.plot.scatter(
             wandb.Table(data=[[x, y] for x, y in zip(all_labels, all_preds)], columns=["Actual", "Predicted"]),
             "Actual", "Predicted", title="Predicted vs Actual Fatigue"
         )})
 
-        mean_label = np.mean(test_labels)
-        baseline_preds = [mean_label] * len(test_labels)
-        baseline_r2 = float(r2_score(test_labels, baseline_preds))
-        wandb.run.summary["baseline_r2"] = baseline_r2
-        print(f"Baseline R^2 (predicting mean {mean_label:.4f}): {baseline_r2:.4f}")
-
+        print(f"Baseline R^2 (predicting previous label): {baseline_r2:.4f}")
         return metrics, all_preds, all_labels
 
     def save_model(self, filename):
         model_info = {
             'state_dict': self.model.state_dict(),
-            'input_size': self.model.lstm.input_size,
+            'input_size': self.model.lstm.input_size,  # Fixed reference
             'hidden_size': self.model.hidden_size,
             'num_layers': self.model.num_layers,
             'date_trained': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -201,18 +214,10 @@ def train_fatigue_model(data_dir='session_data', save_dir='models'):
     wandb.init(project="fatigue_prediction_sweep")
     config = wandb.config
 
-    # Log config for debugging
     print(f"Running with config: {dict(config)}")
 
     processor = FatigueDataProcessor(window_size=config.window_size, overlap=config.overlap)
-    sequences, labels = processor.process_workout_data(data_dir)
-
-    train_seq, temp_seq, train_labels, temp_labels = train_test_split(
-        sequences, labels, test_size=0.3, random_state=42
-    )
-    val_seq, test_seq, val_labels, test_labels = train_test_split(
-        temp_seq, temp_labels, test_size=0.5, random_state=42
-    )
+    train_seq, train_labels, val_seq, val_labels, test_seq, test_labels = processor.process_workout_data(data_dir)
 
     train_seq_stacked = np.vstack(train_seq)
     processor.scaler.fit(train_seq_stacked)
@@ -238,7 +243,7 @@ def train_fatigue_model(data_dir='session_data', save_dir='models'):
         epochs=config.epochs, early_stopping=config.early_stopping
     )
 
-    metrics, _, _ = trainer.evaluate(test_seq, test_labels, processor.scaler)
+    metrics, preds, actual = trainer.evaluate(test_seq, test_labels, processor.scaler)
     print("Evaluation Metrics:", metrics)
 
     run_dir = os.path.join(save_dir, wandb.run.id)
