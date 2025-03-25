@@ -7,3 +7,4 @@ pandas
 buildozer
 scikit-learn
 typing-extensions
+wandb
