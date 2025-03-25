@@ -1,42 +1,43 @@
-program: train_fatigue_modeler.py
-method: bayes  # Bayesian optimization for efficient search
+program: train_fatigue_modeler.py  # Replace with your script name
+method: bayes
 metric:
   name: val_loss
   goal: minimize
 early_terminate:
   type: hyperband
-  min_iter: 10  # Stop runs early if they perform poorly after 10 epochs
+  min_iter: 10
+run_cap: 25  # Limit to 25 runs
 parameters:
   # Training Hyperparameters
   learning_rate:
-    values: [0.01, 0.005, 0.001, 0.0005, 0.0001, 0.00005, 0.00001]  # Wide range to explore
+    values: [0.0005, 0.001, 0.005]  # Narrowed to top-performing range
   batch_size:
-    values: [8, 16, 32, 64, 128]  # From small (noisy gradients) to large (stable gradients)
+    values: [64, 128]  # Focus on larger, stable sizes
   epochs:
-    values: [100, 150, 200]  # Test longer training if beneficial
+    values: [150, 200]  # Longer training from top runs
   early_stopping:
-    values: [10, 20, 30]  # Patience for stopping, balancing overfitting and underfitting
+    values: [10, 20]  # Effective patience values
   weight_decay:
-    min: 1e-6  # L2 regularization, from light to strong
-    max: 1e-2
-    distribution: log_uniform_values  # Log scale for finer control
+    min: 1e-6  # Still light regularization
+    max: 1e-4  # Tightened from 1e-2
+    distribution: log_uniform_values
 
   # Model Hyperparameters
   hidden_size:
-    values: [32, 64, 128, 256]  # Test smaller and larger hidden states
+    values: [128, 256]  # Larger sizes dominate
   num_layers:
-    values: [1, 2, 3, 4]  # From shallow to deeper LSTMs
+    value: 3  # Fixed at 3 (most common in top runs)
   dropout:
-    min: 0.2  # Dropout range to control overfitting
+    min: 0.55  # Narrowed from 0.2-0.7
     max: 0.7
     distribution: uniform
 
   # Data Processing Hyperparameters
   window_size:
-    values: [10, 20, 30, 40, 50]  # Vary sequence length for temporal context
+    values: [30, 40, 50]  # Mid-to-large windows
   overlap:
-    min: 0.3  # Overlap range for sequence generation
+    min: 0.8  # Increased from 0.3 to focus on high overlap
     max: 0.9
     distribution: uniform
 
-description: "Extensive hyperparameter sweep for FatigueLSTM model optimization"
+description: "Optimized sweep targeting R² > 0.95 with fewer runs"

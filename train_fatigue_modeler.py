@@ -44,6 +44,7 @@ class FatigueDataProcessor:
                        'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist',
                        'neck', 'left_spine', 'right_spine', 'left_hip_torso', 'right_hip_torso',
                        'left_shoulder_torso', 'right_shoulder_torso']
+        
     def extract_features(self, df):
         features = []
         for joint in self.joints:
@@ -53,11 +54,14 @@ class FatigueDataProcessor:
             symmetry = df[left].values - df[right].values
             features.append(symmetry)
         return np.array(features).T
+    
     def create_sequences(self, features, labels):
         step = int(self.window_size * (1 - self.overlap))
         sequences, sequence_labels = [], []
         for i in range(0, len(features) - self.window_size + 1, step):
-            sequences.append(features[i:i + self.window_size])
+            window = features[i:i + self.window_size].copy()
+            np.random.shuffle(window)  # Shuffle time steps
+            sequences.append(window)
             sequence_labels.append(labels[i + self.window_size - 1])
         return np.array(sequences), np.array(sequence_labels)
     
