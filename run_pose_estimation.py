@@ -14,7 +14,7 @@ from kivy.clock import Clock
 from kivy.graphics.texture import Texture
 
 class FatigueLSTM(nn.Module):
-    def __init__(self, input_size, hidden_size, num_layers, output_size, dropout=0.2):
+    def __init__(self, input_size, hidden_size, num_layers, output_size, dropout=0.3):
         super(FatigueLSTM, self).__init__()
         self.hidden_size = hidden_size
         self.num_layers = num_layers
@@ -46,21 +46,18 @@ class JointAngleTracker:
     def get_features(self):
         if len(self.joint_angles[self.joints[0]]) < self.window_size:
             return None
-        features = []
-        for joint in self.joints:
-            angles = np.array(self.joint_angles[joint])
-            velocity = np.gradient(angles)
-            acceleration = np.gradient(velocity)
-            features.extend([angles, velocity, acceleration])
+        angles = np.array([list(self.joint_angles[joint]) for joint in self.joints]).T  # (window_size, 19)
+        velocities = np.gradient(angles, axis=0)
+        accelerations = np.gradient(velocities, axis=0)
+        features = np.hstack([angles, velocities, accelerations])  # (window_size, 57)
         symmetry_pairs = [
-            ('left_knee', 'right_knee'),
-            ('left_hip', 'right_hip'),
-            ('left_elbow', 'right_elbow')
+            ('left_knee', 'right_knee'), ('left_hip', 'right_hip'), ('left_elbow', 'right_elbow')
         ]
-        for left, right in symmetry_pairs:
-            symmetry = np.array(self.joint_angles[left]) - np.array(self.joint_angles[right])
-            features.append(symmetry)
-        return np.array(features).T  # Shape: (window_size, 60)
+        symmetries = [np.array(self.joint_angles[left]) - np.array(self.joint_angles[right])
+                      for left, right in symmetry_pairs]
+        features = np.hstack([features] + symmetries)  # (window_size, 60)
+        np.random.shuffle(features)  # Match training shuffling
+        return features
     
     def get_form_feedback(self, fatigue_score=None):
         feedback = []
@@ -78,7 +75,7 @@ class JointAngleTracker:
             feedback.append("Push hips back more; maintain depth without excessive lean")
         features = self.get_features()
         if features is not None:
-            velocities = features[:, 19:38]
+            velocities = features[:, 19:38]  # Adjust indices based on feature count
             avg_velocity = np.mean(np.abs(velocities[-5:]))
             if avg_velocity < 5:
                 feedback.append("Movement slowing; focus on form or rest")
@@ -112,7 +109,7 @@ class RunPoseEstimationApp(App):
         self.layout.add_widget(self.button_layout)
         
         self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose(min_detection_confidence=0.5, min_tracking_confidence=0.5)
+        self.pose = self.mp_pose.Pose(min_detection_confidence=0.7, min_tracking_confidence=0.7)
         self.mp_draw = mp.solutions.drawing_utils
         self.joint_tracker = JointAngleTracker()
         
@@ -126,7 +123,6 @@ class RunPoseEstimationApp(App):
             )
             self.model.load_state_dict(model_info['state_dict'])
             self.model.eval()
-            # Load scaler with weights_only=False to allow full object deserialization
             self.scaler = torch.load('models/scaler.pt', weights_only=False, map_location='cpu')
             print("Model and scaler loaded successfully")
         else:
@@ -134,6 +130,7 @@ class RunPoseEstimationApp(App):
         
         self.capture = None
         self.event = None
+        self.log_file = open("fatigue_log.txt", "w")  # For debugging
         return self.layout
     
     def calculate_angle(self, joint1, joint2, joint3):
@@ -252,42 +249,45 @@ class RunPoseEstimationApp(App):
         scaled_features = self.scaler.transform(features)
         with torch.no_grad():
             x = torch.FloatTensor(scaled_features).unsqueeze(0)
-            return self.model(x).item()
+            pred = self.model(x).item()
+            self.log_file.write(f"Fatigue Score: {pred:.4f}, Feature Mean: {np.mean(features):.4f}, Std: {np.std(features):.4f}\n")
+            return pred
     
     def update(self, dt):
         ret, frame = self.capture.read()
-        if ret:
-            frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            results = self.pose.process(frame_rgb)
+        if not ret:
+            return
+        frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        results = self.pose.process(frame_rgb)
+        
+        if results.pose_landmarks:
+            self.mp_draw.draw_landmarks(frame, results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS)
+            angles = self.calculate_joint_angles(results.pose_landmarks.landmark)
+            self.joint_tracker.update(angles)
             
-            if results.pose_landmarks:
-                self.mp_draw.draw_landmarks(frame, results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS)
-                angles = self.calculate_joint_angles(results.pose_landmarks.landmark)
-                self.joint_tracker.update(angles)
-                
-                features = self.joint_tracker.get_features()
-                fatigue_score = None
-                if features is not None:
-                    fatigue_score = self.predict_fatigue(features)
-                    status = "Low" if fatigue_score < 0.3 else "Medium" if fatigue_score < 0.7 else "High"
-                    self.fatigue_label.text = f'Fatigue Status: {status} ({fatigue_score:.2f})'
-                
-                form_feedback = self.joint_tracker.get_form_feedback(fatigue_score)
-                posture_feedback = [f for f in form_feedback if "fatigue" not in f.lower()]
-                trainer_advice = [f for f in form_feedback if "fatigue" in f.lower()]
-                
-                self.form_label.text = 'Form Feedback: ' + ('None' if not posture_feedback else '; '.join(posture_feedback))
-                self.trainer_label.text = 'Trainer Advice: ' + ('None' if not trainer_advice else '; '.join(trainer_advice))
-                
-                y_pos = 30
-                for joint, angle in angles.items():
-                    cv2.putText(frame, f"{joint}: {angle:.1f}", (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-                    y_pos += 20
+            features = self.joint_tracker.get_features()
+            fatigue_score = None
+            if features is not None:
+                fatigue_score = self.predict_fatigue(features)
+                status = "Low" if fatigue_score < 0.3 else "Medium" if fatigue_score < 0.7 else "High"
+                self.fatigue_label.text = f'Fatigue Status: {status} ({fatigue_score:.2f})'
             
-            buf = cv2.flip(frame, 0).tobytes()
-            texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
-            texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
-            self.image.texture = texture
+            form_feedback = self.joint_tracker.get_form_feedback(fatigue_score)
+            posture_feedback = [f for f in form_feedback if "fatigue" not in f.lower()]
+            trainer_advice = [f for f in form_feedback if "fatigue" in f.lower()]
+            
+            self.form_label.text = 'Form Feedback: ' + ('None' if not posture_feedback else '; '.join(posture_feedback))
+            self.trainer_label.text = 'Trainer Advice: ' + ('None' if not trainer_advice else '; '.join(trainer_advice))
+            
+            y_pos = 30
+            for joint, angle in angles.items():
+                cv2.putText(frame, f"{joint}: {angle:.1f}", (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
+                y_pos += 20
+        
+        buf = cv2.flip(frame, 0).tobytes()
+        texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
+        texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
+        self.image.texture = texture
     
     def start_camera(self, instance):
         self.capture = cv2.VideoCapture(0)
@@ -303,6 +303,7 @@ class RunPoseEstimationApp(App):
     def on_stop(self):
         self.stop_camera(None)
         self.pose.close()
+        self.log_file.close()
 
 if __name__ == '__main__':
     RunPoseEstimationApp().run()

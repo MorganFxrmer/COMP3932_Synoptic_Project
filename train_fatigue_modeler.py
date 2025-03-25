@@ -7,11 +7,10 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-import matplotlib.pyplot as plt
 import os
 import json
 from datetime import datetime
-import wandb  # Import W&B
+import wandb
 
 class WorkoutDataset(Dataset):
     def __init__(self, sequences, labels):
@@ -44,7 +43,7 @@ class FatigueDataProcessor:
                        'left_shoulder', 'right_shoulder', 'left_elbow', 'right_elbow', 'left_wrist', 'right_wrist',
                        'neck', 'left_spine', 'right_spine', 'left_hip_torso', 'right_hip_torso',
                        'left_shoulder_torso', 'right_shoulder_torso']
-        
+
     def extract_features(self, df):
         features = []
         for joint in self.joints:
@@ -54,13 +53,13 @@ class FatigueDataProcessor:
             symmetry = df[left].values - df[right].values
             features.append(symmetry)
         return np.array(features).T
-    
+
     def create_sequences(self, features, labels):
         step = int(self.window_size * (1 - self.overlap))
         sequences, sequence_labels = [], []
         for i in range(0, len(features) - self.window_size + 1, step):
-            window = features[i:i + self.window_size].copy()
-            np.random.shuffle(window)  # Shuffle time steps
+            window = features[i:i + self.window_size]
+            np.random.shuffle(window)
             sequences.append(window)
             sequence_labels.append(labels[i + self.window_size - 1])
         return np.array(sequences), np.array(sequence_labels)
@@ -76,16 +75,15 @@ class FatigueDataProcessor:
                 sequences, labels = self.create_sequences(features, fatigue_labels)
                 all_sequences.extend(sequences)
                 all_labels.extend(labels)
+        
         hist, bins = np.histogram(all_labels, bins=10, range=(0, 1))
         print("Histogram of fatigue labels (0-1 scale):")
         print(f"Counts: {hist}")
         print(f"Bin edges: {bins}")
         wandb.log({"Fatigue Label Distribution": wandb.Histogram(np_histogram=(hist, bins))})
-        shaped_sequences = np.vstack(all_sequences)
-        self.scaler.fit(shaped_sequences)
-        scaled_sequences = [self.scaler.transform(seq) for seq in all_sequences]
+        
         print(f"Processed {len(all_sequences)} sequences from {len(os.listdir(data_dir))} files")
-        return np.array(scaled_sequences), np.array(all_labels)
+        return np.array(all_sequences), np.array(all_labels)
 
 class FatigueModelTrainer:
     def __init__(self, model, learning_rate, batch_size, weight_decay):
@@ -95,26 +93,34 @@ class FatigueModelTrainer:
         self.weight_decay = weight_decay
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model.to(self.device)
-        self.optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
-    def train(self, train_sequences, train_labels, val_sequences, val_labels, epochs, early_stopping):
-        train_dataset = WorkoutDataset(train_sequences, train_labels)
-        val_dataset = WorkoutDataset(val_sequences, val_labels)
+
+    def train(self, train_sequences, train_labels, val_sequences, val_labels, scaler, epochs, early_stopping):
+        train_sequences_scaled = np.array([scaler.transform(seq) for seq in train_sequences])
+        val_sequences_scaled = np.array([scaler.transform(seq) for seq in val_sequences])
+
+        train_dataset = WorkoutDataset(train_sequences_scaled, train_labels)
+        val_dataset = WorkoutDataset(val_sequences_scaled, val_labels)
         train_loader = DataLoader(train_dataset, batch_size=self.batch_size, shuffle=True)
         val_loader = DataLoader(val_dataset, batch_size=self.batch_size)
-        scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min', patience=5, factor=0.5)
+
+        optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
+        scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, factor=0.5)
         criterion = nn.MSELoss()
-        history = {'train_loss': [], 'val_loss': [], 'best_val_loss': float('inf'), 'epochs_no_improve': 0}
+        best_val_loss = float('inf')
+        epochs_no_improve = 0
+
         for epoch in range(epochs):
             self.model.train()
             train_loss = 0
             for sequences, labels in train_loader:
                 sequences, labels = sequences.to(self.device), labels.to(self.device)
-                self.optimizer.zero_grad()
+                optimizer.zero_grad()
                 outputs = self.model(sequences)
                 loss = criterion(outputs, labels.unsqueeze(1))
                 loss.backward()
-                self.optimizer.step()
+                optimizer.step()
                 train_loss += loss.item()
+
             self.model.eval()
             val_loss = 0
             with torch.no_grad():
@@ -122,33 +128,36 @@ class FatigueModelTrainer:
                     sequences, labels = sequences.to(self.device), labels.to(self.device)
                     outputs = self.model(sequences)
                     val_loss += criterion(outputs, labels.unsqueeze(1)).item()
+
             avg_train_loss = train_loss / len(train_loader)
             avg_val_loss = val_loss / len(val_loader)
-            history['train_loss'].append(float(avg_train_loss))
-            history['val_loss'].append(float(avg_val_loss))
-            scheduler.step(avg_val_loss)
-            wandb.log({
-                "epoch": epoch + 1,
-                "train_loss": avg_train_loss,
-                "val_loss": avg_val_loss,
-                "learning_rate": self.optimizer.param_groups[0]['lr']
-            })
-            if avg_val_loss < history['best_val_loss']:
-                history['best_val_loss'] = float(avg_val_loss)
-                history['epochs_no_improve'] = 0
+
+            wandb.log({"epoch": epoch, "train_loss": avg_train_loss, "val_loss": avg_val_loss})
+
+            # Improved early stopping logic
+            if avg_val_loss < best_val_loss:
+                best_val_loss = avg_val_loss
+                epochs_no_improve = 0
                 self.save_model('best_model.pt')
+                wandb.run.summary["best_val_loss"] = best_val_loss
             else:
-                history['epochs_no_improve'] += 1
-            if (epoch + 1) % 1 == 0:
-                print(f'Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}')
-            if history['epochs_no_improve'] >= early_stopping:
-                print(f'Early stopping at epoch {epoch+1}')
+                epochs_no_improve += 1
+
+            if (epoch + 1) % 10 == 0:
+                print(f'Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}, Epochs No Improve: {epochs_no_improve}')
+
+            if epochs_no_improve >= early_stopping:
+                print(f'Early stopping triggered after epoch {epoch+1} with patience {early_stopping}')
                 break
-        return history
-    def evaluate(self, test_sequences, test_labels):
-        self.model.eval()
-        test_dataset = WorkoutDataset(test_sequences, test_labels)
+
+        return {"best_val_loss": best_val_loss}
+
+    def evaluate(self, test_sequences, test_labels, scaler):
+        test_sequences_scaled = np.array([scaler.transform(seq) for seq in test_sequences])
+        test_dataset = WorkoutDataset(test_sequences_scaled, test_labels)
         test_loader = DataLoader(test_dataset, batch_size=self.batch_size)
+        
+        self.model.eval()
         all_preds, all_labels = [], []
         with torch.no_grad():
             for sequences, labels in test_loader:
@@ -156,21 +165,28 @@ class FatigueModelTrainer:
                 outputs = self.model(sequences)
                 all_preds.extend(outputs.cpu().numpy().flatten())
                 all_labels.extend(labels.numpy().flatten())
+
         metrics = {
             'mse': float(mean_squared_error(all_labels, all_preds)),
             'rmse': float(np.sqrt(mean_squared_error(all_labels, all_preds))),
             'mae': float(mean_absolute_error(all_labels, all_preds)),
             'r2': float(r2_score(all_labels, all_preds))
         }
-        wandb.log(metrics)
-        fig, ax = plt.subplots()
-        ax.scatter(all_labels, all_preds, alpha=0.5)
-        ax.plot([0, 1], [0, 1], 'r--')
-        ax.set_xlabel('Actual')
-        ax.set_ylabel('Predicted')
-        wandb.log({"Predictions vs Actual": wandb.Image(fig)})
-        plt.close(fig)
+
+        wandb.run.summary.update(metrics)
+        wandb.log({"Pred vs Actual": wandb.plot.scatter(
+            wandb.Table(data=[[x, y] for x, y in zip(all_labels, all_preds)], columns=["Actual", "Predicted"]),
+            "Actual", "Predicted", title="Predicted vs Actual Fatigue"
+        )})
+
+        mean_label = np.mean(test_labels)
+        baseline_preds = [mean_label] * len(test_labels)
+        baseline_r2 = float(r2_score(test_labels, baseline_preds))
+        wandb.run.summary["baseline_r2"] = baseline_r2
+        print(f"Baseline R^2 (predicting mean {mean_label:.4f}): {baseline_r2:.4f}")
+
         return metrics, all_preds, all_labels
+
     def save_model(self, filename):
         model_info = {
             'state_dict': self.model.state_dict(),
@@ -180,32 +196,28 @@ class FatigueModelTrainer:
             'date_trained': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
         torch.save(model_info, filename)
-        artifact = wandb.Artifact('model', type='model')
-        artifact.add_file(filename)
-        wandb.log_artifact(artifact)
-    def export_to_mobile(self, filename='mobile_model.pt'):
-        example_input = torch.randn(1, self.model.get_input_size()).unsqueeze(0)
-        traced_model = torch.jit.trace(self.model, example_input)
-        torch.jit.save(traced_model, filename)
-        print(f"Model exported for mobile deployment at {filename}")
-        quantized_model = torch.quantization.quantize_dynamic(self.model, {nn.LSTM, nn.Linear}, dtype=torch.qint8)
-        traced_quantized = torch.jit.trace(quantized_model, example_input)
-        torch.jit.save(traced_quantized, 'quantized_' + filename)
-        print(f"Quantized model exported at quantized_{filename}")
 
-def train_fatigue_model(data_dir, save_dir='models'):
-    if not os.path.exists(save_dir): os.makedirs(save_dir)
-    # Initialize W&B with sweep config
-    wandb.init(project="fatigue-lstm")
+def train_fatigue_model(data_dir='session_data', save_dir='models'):
+    wandb.init(project="fatigue_prediction_sweep")
     config = wandb.config
-    
-    # Use sweep parameters
+
+    # Log config for debugging
+    print(f"Running with config: {dict(config)}")
+
     processor = FatigueDataProcessor(window_size=config.window_size, overlap=config.overlap)
     sequences, labels = processor.process_workout_data(data_dir)
-    train_seq, temp_seq, train_labels, temp_labels = train_test_split(sequences, labels, test_size=0.3, random_state=42)
-    val_seq, test_seq, val_labels, test_labels = train_test_split(temp_seq, temp_labels, test_size=0.5, random_state=42)
+
+    train_seq, temp_seq, train_labels, temp_labels = train_test_split(
+        sequences, labels, test_size=0.3, random_state=42
+    )
+    val_seq, test_seq, val_labels, test_labels = train_test_split(
+        temp_seq, temp_labels, test_size=0.5, random_state=42
+    )
+
+    train_seq_stacked = np.vstack(train_seq)
+    processor.scaler.fit(train_seq_stacked)
+
     input_feature_count = train_seq.shape[2]
-    
     model = FatigueLSTM(
         input_size=input_feature_count,
         hidden_size=config.hidden_size,
@@ -213,53 +225,28 @@ def train_fatigue_model(data_dir, save_dir='models'):
         output_size=1,
         dropout=config.dropout
     )
+
     trainer = FatigueModelTrainer(
         model,
         learning_rate=config.learning_rate,
         batch_size=config.batch_size,
         weight_decay=config.weight_decay
     )
+
     history = trainer.train(
-        train_seq, train_labels, val_seq, val_labels,
-        epochs=config.epochs,
-        early_stopping=config.early_stopping
+        train_seq, train_labels, val_seq, val_labels, processor.scaler,
+        epochs=config.epochs, early_stopping=config.early_stopping
     )
-    
-    # Log loss plot
-    fig, ax = plt.subplots()
-    ax.plot(history['train_loss'], label='Train Loss')
-    ax.plot(history['val_loss'], label='Val Loss')
-    ax.set_xlabel('Epoch')
-    ax.set_ylabel('Loss')
-    ax.legend()
-    wandb.log({"Loss Plot": wandb.Image(fig)})
-    plt.close(fig)
-    
-    metrics, predictions, actual = trainer.evaluate(test_seq, test_labels)
-    print("Model Evaluation Metrics:")
-    for metric, value in metrics.items():
-        print(f"{metric.upper()}: {value:.4f}")
-    
-    trainer.export_to_mobile()
-    results = {
-        'training_history': history,
-        'evaluation_metrics': metrics,
-        'model_config': {
-            'input_size': input_feature_count,
-            'hidden_size': config.hidden_size,
-            'num_layers': config.num_layers
-        }
-    }
-    with open(os.path.join(save_dir, 'model_results.json'), 'w') as f:
-        json.dump(results, f, indent=4)
-    torch.save(processor.scaler, os.path.join(save_dir, 'scaler.pt'))
-    artifact = wandb.Artifact('scaler', type='scaler')
-    artifact.add_file(os.path.join(save_dir, 'scaler.pt'))
-    wandb.log_artifact(artifact)
-    
-    print("Training and evaluation completed. Model and artifacts saved in", save_dir)
+
+    metrics, _, _ = trainer.evaluate(test_seq, test_labels, processor.scaler)
+    print("Evaluation Metrics:", metrics)
+
+    run_dir = os.path.join(save_dir, wandb.run.id)
+    os.makedirs(run_dir, exist_ok=True)
+    trainer.save_model(os.path.join(run_dir, 'best_model.pt'))
+    torch.save(processor.scaler, os.path.join(run_dir, 'scaler.pt'))
+
     wandb.finish()
-    return trainer, processor, metrics
 
 if __name__ == '__main__':
-    train_fatigue_model('session_data')
+    train_fatigue_model()
