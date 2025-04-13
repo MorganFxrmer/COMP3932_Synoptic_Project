@@ -18,13 +18,13 @@ parameters:
   early_stopping:
     values: [10, 20]  # Effective patience values
   weight_decay:
-    min: 1e-6  # Still light regularization
+    min: 1e-6  # Still light regularisation
     max: 1e-4  # Tightened from 1e-2
     distribution: log_uniform_values
 
   # Model Hyperparameters
   hidden_size:
-    values: [128, 256]  # Larger sizes dominate
+    values: [128, 256]  # Larger sizes perform best
   num_layers:
     value: 3  # Fixed at 3 (most common in top runs)
   dropout:
@@ -34,7 +34,7 @@ parameters:
 
   # Data Processing Hyperparameters
   window_size:
-    values: [30, 40, 50]  # Mid-to-large windows
+    values: [30, 40, 50]  # Mid-to-large windows for best performance
   overlap:
     min: 0.8  # Increased from 0.3 to focus on high overlap
     max: 0.9
