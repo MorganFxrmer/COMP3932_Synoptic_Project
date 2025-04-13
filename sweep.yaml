@@ -1,4 +1,4 @@
-program: train_fatigue_modeler.py  # Replace with your script name
+program: train_fatigue_modeler.py
 method: bayes
 metric:
   name: val_loss
@@ -12,19 +12,19 @@ parameters:
   learning_rate:
     values: [0.0005, 0.001, 0.005]  # Narrowed to top-performing range
   batch_size:
-    values: [64, 128]  # Focus on larger, stable sizes
+    values: [64, 128]  # Focused on larger, stable sizes
   epochs:
     values: [150, 200]  # Longer training from top runs
   early_stopping:
     values: [10, 20]  # Effective patience values
   weight_decay:
-    min: 1e-6  # Still light regularization
+    min: 1e-6  # Still light regularisation
     max: 1e-4  # Tightened from 1e-2
     distribution: log_uniform_values
 
   # Model Hyperparameters
   hidden_size:
-    values: [128, 256]  # Larger sizes dominate
+    values: [128, 256]  # Larger sizes perform best
   num_layers:
     value: 3  # Fixed at 3 (most common in top runs)
   dropout:
@@ -34,10 +34,10 @@ parameters:
 
   # Data Processing Hyperparameters
   window_size:
-    values: [30, 40, 50]  # Mid-to-large windows
+    values: [30, 40, 50]  # Mid-to-large windows for best performance
   overlap:
     min: 0.8  # Increased from 0.3 to focus on high overlap
     max: 0.9
     distribution: uniform
 
-description: "Optimized sweep targeting R² > 0.95 with fewer runs"
+description: "Optimized sweep targeting low error rates with fewer runs"
