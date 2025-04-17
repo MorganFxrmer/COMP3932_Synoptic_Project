@@ -46,12 +46,14 @@ import torch
                         'left_shoulder_torso', 'right_shoulder_torso']
          
      def extract_features(self, df):
-         features = []
-         for joint in self.joints:
- @@ -53,208 +54,211 @@
-             symmetry = df[left].values - df[right].values
-             features.append(symmetry)
-         return np.array(features).T
+        features = []
+        for joint in self.joints:
+            joint_data = df[joint].values
+            features.extend([joint_data, np.gradient(joint_data), np.gradient(np.gradient(joint_data))])
+        for left, right in [('left_knee', 'right_knee'), ('left_hip', 'right_hip'), ('left_elbow', 'right_elbow')]:
+            symmetry = df[left].values - df[right].values
+            features.append(symmetry)
+        return np.array(features).T
      
      def create_sequences(self, features, labels):
          step = int(self.window_size * (1 - self.overlap))

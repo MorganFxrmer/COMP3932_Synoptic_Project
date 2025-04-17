@@ -36,8 +36,7 @@ parameters:
   window_size:
     values: [30, 40, 50]  # Mid-to-large windows for best performance
   overlap:
-    min: 0.8  # Increased from 0.3 to focus on high overlap
-    max: 0.9
+    values: [0.4, 0.5, 0.6]
     distribution: uniform
 
-description: "Optimized sweep targeting low error rates with fewer runs"
+description: "Optimised sweep targeting low error rates with fewer runs"
