@@ -36,3 +36,7 @@ parameters:
   overlap:
     values: [0.2, 0.3, 0.4]  # Lowered to increase sequence diversity
 description: "Sweep to reduce temporal dependency while targeting low RMSE"
+command:
+  - "c:\\Users\\morga\\Documents\\University\\Year 3\\Dissertation\\Code\\COMP3932_Synoptic_Project\\.venv\\Scripts\\python.exe"
+  - "${program}"
+  - "${args}"
