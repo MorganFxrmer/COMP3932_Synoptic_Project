@@ -79,7 +79,6 @@ class FatigueDataProcessor:
         all_labels = np.concatenate(all_labels)
         sequences, labels = self.create_sequences(all_features, all_labels)
         
-        # Shuffle sequences to reduce temporal correlation
         indices = np.random.permutation(len(sequences))
         sequences = sequences[indices]
         labels = labels[indices]
@@ -183,7 +182,7 @@ class FatigueModelTrainer:
             outputs.mean().backward()
             feature_grads.append(sequences.grad.abs().mean(dim=[0, 1]).cpu().numpy())
             sequences.grad.zero_()
-            all_preds.extend(outputs.cpu().numpy().flatten())
+            all_preds.extend(outputs.detach().cpu().numpy().flatten())
             all_labels.extend(labels.numpy().flatten())
 
         all_preds = np.clip(all_preds, 0, 1)
@@ -198,7 +197,7 @@ class FatigueModelTrainer:
             'r2': float(r2_score(all_labels, all_preds))
         }
 
-        baseline_preds = np.roll(test_labels, -1)  # Use previous label
+        baseline_preds = np.roll(test_labels, -1)
         baseline_preds[-1] = test_labels[-1]
         baseline_r2 = float(r2_score(test_labels, baseline_preds))
 
@@ -225,7 +224,7 @@ class FatigueModelTrainer:
 def train_fatigue_model(data_dir='session_data', save_dir='models'):
     wandb.init(project="fatigue_prediction_sweep", config={
         "window_size": 40,
-        "overlap": 0.5,  # Reduced for diversity
+        "overlap": 0.5,
         "learning_rate": 0.0005,
         "dropout": 0.7,
         "weight_decay": 1e-4,
