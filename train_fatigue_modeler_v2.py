@@ -4,7 +4,7 @@ import torch.optim as optim
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split, KFold
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
 import os
@@ -63,7 +63,7 @@ class FatigueDataProcessor:
             sequence_labels.append(labels[i + self.window_size - 1])
         return np.array(sequences), np.array(sequence_labels)
     
-    def process_workout_data(self, data_dir):
+    def process_workout_data(self, data_dir, k_folds=None):
         all_features, all_labels = [], []
         for filename in os.listdir(data_dir):
             if filename.endswith('.csv'):
@@ -83,21 +83,32 @@ class FatigueDataProcessor:
         sequences = sequences[indices]
         labels = labels[indices]
         
-        train_seq, temp_seq, train_labels, temp_labels = train_test_split(
-            sequences, labels, test_size=0.3, random_state=42
-        )
-        val_seq, test_seq, val_labels, test_labels = train_test_split(
-            temp_seq, temp_labels, test_size=0.5, random_state=42
-        )
-
-        hist, bins = np.histogram(labels, bins=10, range=(0, 1))
-        print("Histogram of fatigue labels (0-1 scale):")
-        print(f"Counts: {hist}")
-        print(f"Bin edges: {bins}")
-        wandb.log({"Fatigue Label Distribution": wandb.Histogram(np_histogram=(hist, bins))})
-        
-        print(f"Processed {len(sequences)} sequences from {len(os.listdir(data_dir))} files")
-        return train_seq, train_labels, val_seq, val_labels, test_seq, test_labels
+        if k_folds:
+            kf = KFold(n_splits=k_folds, shuffle=True, random_state=42)
+            fold_results = []
+            for fold, (train_idx, test_idx) in enumerate(kf.split(sequences)):
+                train_seq, test_seq = sequences[train_idx], sequences[test_idx]
+                train_labels, test_labels = labels[train_idx], labels[test_idx]
+                train_seq, val_seq, train_labels, val_labels = train_test_split(
+                    train_seq, train_labels, test_size=0.1765, random_state=42  # 15% of 85% = 12.5% validation
+                )
+                fold_results.append((train_seq, train_labels, val_seq, val_labels, test_seq, test_labels))
+                wandb.log({"fold": fold, "train_size": len(train_seq), "val_size": len(val_seq), "test_size": len(test_seq)})
+            return fold_results
+        else:
+            train_seq, temp_seq, train_labels, temp_labels = train_test_split(
+                sequences, labels, test_size=0.3, random_state=42
+            )
+            val_seq, test_seq, val_labels, test_labels = train_test_split(
+                temp_seq, temp_labels, test_size=0.5, random_state=42
+            )
+            hist, bins = np.histogram(labels, bins=10, range=(0, 1))
+            print("Histogram of fatigue labels (0-1 scale):")
+            print(f"Counts: {hist}")
+            print(f"Bin edges: {bins}")
+            wandb.log({"Fatigue Label Distribution": wandb.Histogram(np_histogram=(hist, bins))})
+            print(f"Processed {len(sequences)} sequences from {len(os.listdir(data_dir))} files")
+            return train_seq, train_labels, val_seq, val_labels, test_seq, test_labels
 
 class FatigueModelTrainer:
     def __init__(self, model, learning_rate, batch_size, weight_decay):
@@ -189,6 +200,7 @@ class FatigueModelTrainer:
         mean_grads = np.mean(feature_grads, axis=0)
         print(f"Feature gradients: {mean_grads}")
         wandb.log({"Feature Gradients": wandb.Histogram(mean_grads)})
+        wandb.run.summary["avg_feature_gradient"] = np.mean(mean_grads)
 
         metrics = {
             'mse': float(mean_squared_error(all_labels, all_preds)),
@@ -196,6 +208,12 @@ class FatigueModelTrainer:
             'mae': float(mean_absolute_error(all_labels, all_preds)),
             'r2': float(r2_score(all_labels, all_preds))
         }
+        wandb.log({
+            "test_mse": metrics["mse"],
+            "test_rmse": metrics["rmse"],
+            "test_mae": metrics["mae"],
+            "test_r2": metrics["r2"]
+        })
 
         baseline_preds = np.roll(test_labels, -1)
         baseline_preds[-1] = test_labels[-1]
@@ -206,6 +224,11 @@ class FatigueModelTrainer:
         wandb.log({"Pred vs Actual": wandb.plot.scatter(
             wandb.Table(data=[[x, y] for x, y in zip(all_labels, all_preds)], columns=["Actual", "Predicted"]),
             "Actual", "Predicted", title="Predicted vs Actual Fatigue"
+        )})
+        residuals = np.array(all_labels) - np.array(all_preds)
+        wandb.log({"Residual Plot": wandb.plot.scatter(
+            wandb.Table(data=[[x, y] for x, y in zip(all_labels, residuals)], columns=["Actual", "Residual"]),
+            "Actual", "Residual", title="Residuals vs Actual Fatigue"
         )})
 
         print(f"Baseline R^2 (predicting previous label): {baseline_r2:.4f}")
@@ -221,7 +244,7 @@ class FatigueModelTrainer:
         }
         torch.save(model_info, filename)
 
-def train_fatigue_model(data_dir='session_data', save_dir='models'):
+def train_fatigue_model(data_dir='session_data', holdout_dir=None, save_dir='models', k_folds=None):
     wandb.init(project="fatigue_prediction_sweep", config={
         "window_size": 40,
         "overlap": 0.5,
@@ -232,48 +255,94 @@ def train_fatigue_model(data_dir='session_data', save_dir='models'):
         "epochs": 200,
         "early_stopping": 20,
         "hidden_size": 256,
-        "num_layers": 3
+        "num_layers": 3,
+        "k_folds": k_folds,
+        "holdout_dir": holdout_dir
     })
     config = wandb.config
 
     print(f"Running with config: {dict(config)}")
 
     processor = FatigueDataProcessor(window_size=config.window_size, overlap=config.overlap)
-    train_seq, train_labels, val_seq, val_labels, test_seq, test_labels = processor.process_workout_data(data_dir)
-
-    train_seq_stacked = np.vstack(train_seq)
-    processor.scaler.fit(train_seq_stacked)
-    train_seq_scaled = np.array([processor.scaler.transform(seq) for seq in train_seq])
-    print(f"Scaled train mean: {np.mean(train_seq_scaled):.4f}, std: {np.std(train_seq_scaled):.4f}")
-
-    input_feature_count = train_seq.shape[2]
-    model = FatigueLSTM(
-        input_size=input_feature_count,
-        hidden_size=config.hidden_size,
-        num_layers=config.num_layers,
-        output_size=1,
-        dropout=config.dropout
-    )
-
-    trainer = FatigueModelTrainer(
-        model,
-        learning_rate=config.learning_rate,
-        batch_size=config.batch_size,
-        weight_decay=config.weight_decay
-    )
-
-    history = trainer.train(
-        train_seq, train_labels, val_seq, val_labels, processor.scaler,
-        epochs=config.epochs, early_stopping=config.early_stopping
-    )
-
-    metrics, preds, actual = trainer.evaluate(test_seq, test_labels, processor.scaler)
-    print("Evaluation Metrics:", metrics)
+    
+    if config.k_folds:
+        fold_results = processor.process_workout_data(data_dir, k_folds=config.k_folds)
+        cv_metrics = []
+        for fold, (train_seq, train_labels, val_seq, val_labels, test_seq, test_labels) in enumerate(fold_results):
+            print(f"Training fold {fold + 1}/{config.k_folds}")
+            train_seq_stacked = np.vstack(train_seq)
+            processor.scaler.fit(train_seq_stacked)
+            input_feature_count = train_seq.shape[2]
+            model = FatigueLSTM(
+                input_size=input_feature_count,
+                hidden_size=config.hidden_size,
+                num_layers=config.num_layers,
+                output_size=1,
+                dropout=config.dropout
+            )
+            trainer = FatigueModelTrainer(
+                model,
+                learning_rate=config.learning_rate,
+                batch_size=config.batch_size,
+                weight_decay=config.weight_decay
+            )
+            history = trainer.train(
+                train_seq, train_labels, val_seq, val_labels, processor.scaler,
+                epochs=config.epochs, early_stopping=config.early_stopping
+            )
+            metrics, _, _ = trainer.evaluate(test_seq, test_labels, processor.scaler)
+            wandb.log({f"fold_{fold}_test_rmse": metrics["rmse"], f"fold_{fold}_test_r2": metrics["r2"]})
+            cv_metrics.append(metrics)
+        avg_metrics = {key: np.mean([m[key] for m in cv_metrics]) for key in cv_metrics[0]}
+        wandb.log({"cv_avg_rmse": avg_metrics["rmse"], "cv_avg_r2": avg_metrics["r2"]})
+        print(f"Cross-validation metrics: {avg_metrics}")
+    else:
+        train_seq, train_labels, val_seq, val_labels, test_seq, test_labels = processor.process_workout_data(data_dir)
+        train_seq_stacked = np.vstack(train_seq)
+        processor.scaler.fit(train_seq_stacked)
+        print(f"Scaled train mean: {np.mean(np.array([processor.scaler.transform(seq) for seq in train_seq])):.4f}, "
+              f"std: {np.std(np.array([processor.scaler.transform(seq) for seq in train_seq])):.4f}")
+        input_feature_count = train_seq.shape[2]
+        model = FatigueLSTM(
+            input_size=input_feature_count,
+            hidden_size=config.hidden_size,
+            num_layers=config.num_layers,
+            output_size=1,
+            dropout=config.dropout
+        )
+        trainer = FatigueModelTrainer(
+            model,
+            learning_rate=config.learning_rate,
+            batch_size=config.batch_size,
+            weight_decay=config.weight_decay
+        )
+        history = trainer.train(
+            train_seq, train_labels, val_seq, val_labels, processor.scaler,
+            epochs=config.epochs, early_stopping=config.early_stopping
+        )
+        metrics, preds, actual = trainer.evaluate(test_seq, test_labels, processor.scaler)
+        print("Test Metrics:", metrics)
+        
+        if config.holdout_dir:
+            holdout_processor = FatigueDataProcessor(window_size=config.window_size, overlap=config.overlap)
+            holdout_seq, holdout_labels, _, _, _, _ = holdout_processor.process_workout_data(config.holdout_dir)
+            holdout_metrics, _, _ = trainer.evaluate(holdout_seq, holdout_labels, processor.scaler)
+            print("Holdout Metrics:", holdout_metrics)
+            wandb.log({
+                "holdout_mse": holdout_metrics["mse"],
+                "holdout_rmse": holdout_metrics["rmse"],
+                "holdout_mae": holdout_metrics["mae"],
+                "holdout_r2": holdout_metrics["r2"]
+            })
 
     run_dir = os.path.join(save_dir, wandb.run.id)
     os.makedirs(run_dir, exist_ok=True)
     trainer.save_model(os.path.join(run_dir, 'best_model.pt'))
     torch.save(processor.scaler, os.path.join(run_dir, 'scaler.pt'))
+    artifact = wandb.Artifact(f"model-{wandb.run.id}", type="model")
+    artifact.add_file(os.path.join(run_dir, 'best_model.pt'))
+    artifact.add_file(os.path.join(run_dir, 'scaler.pt'))
+    wandb.log_artifact(artifact)
 
     wandb.finish()
 

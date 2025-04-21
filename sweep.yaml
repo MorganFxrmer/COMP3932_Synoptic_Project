@@ -27,8 +27,8 @@ parameters:
   num_layers:
     values: [2, 3]  # Test shallower LSTM to reduce temporal focus
   dropout:
-    min: 0.6  # Higher to prevent overfitting
-    max: 0.8
+    min: 0.2 # Higher to prevent overfitting
+    max: 0.5
     distribution: uniform
   # Data Processing Hyperparameters
   window_size:
