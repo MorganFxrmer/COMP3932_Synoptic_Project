@@ -48,8 +48,11 @@ class FatigueDataProcessor:
         features = []
         for joint in self.joints:
             joint_data = df[joint].values
-            features.extend([joint_data, np.gradient(joint_data), np.gradient(np.gradient(joint_data))])
-        for left, right in [('left_knee', 'right_knee'), ('left_hip', 'right_hip'), ('left_elbow', 'right_elbow')]:
+            velocity = np.gradient(joint_data)
+            acceleration = np.gradient(velocity)
+            features.extend([joint_data, velocity, acceleration])
+        for left, right in [('left_knee', 'right_knee'), ('left_hip', 'right_hip'), ('left_elbow', 'right_elbow'),
+                            ('left_shoulder', 'right_shoulder'), ('left_wrist', 'right_wrist')]:
             symmetry = df[left].values - df[right].values
             features.append(symmetry)
         return np.array(features).T
@@ -90,7 +93,7 @@ class FatigueDataProcessor:
                 train_seq, test_seq = sequences[train_idx], sequences[test_idx]
                 train_labels, test_labels = labels[train_idx], labels[test_idx]
                 train_seq, val_seq, train_labels, val_labels = train_test_split(
-                    train_seq, train_labels, test_size=0.1765, random_state=42  # 15% of 85% = 12.5% validation
+                    train_seq, train_labels, test_size=0.1765, random_state=42
                 )
                 fold_results.append((train_seq, train_labels, val_seq, val_labels, test_seq, test_labels))
                 wandb.log({"fold": fold, "train_size": len(train_seq), "val_size": len(val_seq), "test_size": len(test_seq)})
@@ -131,7 +134,7 @@ class FatigueModelTrainer:
         optimizer = optim.Adam(self.model.parameters(), lr=self.learning_rate, weight_decay=self.weight_decay)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'min', patience=5, factor=0.5)
         criterion = nn.MSELoss()
-        best_val_loss = float('inf')
+        best_val_r2 = -float('inf')
         epochs_no_improve = 0
         tolerance = 1e-4
 
@@ -144,39 +147,44 @@ class FatigueModelTrainer:
                 outputs = self.model(sequences)
                 loss = criterion(outputs, labels.unsqueeze(1))
                 loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=1.0)
                 optimizer.step()
                 train_loss += loss.item()
 
             self.model.eval()
-            val_loss = 0
+            val_loss, val_r2 = 0, 0
+            val_preds, val_labels_list = [], []
             with torch.no_grad():
                 for sequences, labels in val_loader:
                     sequences, labels = sequences.to(self.device), labels.to(self.device)
                     outputs = self.model(sequences)
                     val_loss += criterion(outputs, labels.unsqueeze(1)).item()
+                    val_preds.extend(outputs.cpu().numpy().flatten())
+                    val_labels_list.extend(labels.cpu().numpy().flatten())
 
             avg_train_loss = train_loss / len(train_loader)
             avg_val_loss = val_loss / len(val_loader)
+            val_r2 = r2_score(val_labels_list, np.clip(val_preds, 0, 1))
 
-            wandb.log({"epoch": epoch, "train_loss": avg_train_loss, "val_loss": avg_val_loss})
+            wandb.log({"epoch": epoch, "train_loss": avg_train_loss, "val_loss": avg_val_loss, "val_r2": val_r2})
 
-            if avg_val_loss < best_val_loss - tolerance:
-                best_val_loss = avg_val_loss
+            if val_r2 > best_val_r2 + tolerance:
+                best_val_r2 = val_r2
                 epochs_no_improve = 0
                 self.save_model('best_model.pt')
-                wandb.run.summary["best_val_loss"] = best_val_loss
+                wandb.run.summary["best_val_r2"] = best_val_r2
             else:
                 epochs_no_improve += 1
 
             if (epoch + 1) % 10 == 0:
                 print(f'Epoch [{epoch+1}/{epochs}], Train Loss: {avg_train_loss:.4f}, Val Loss: {avg_val_loss:.4f}, '
-                      f'Epochs No Improve: {epochs_no_improve}, Best Val Loss: {best_val_loss:.6f}')
+                      f'Val R²: {val_r2:.4f}, Epochs No Improve: {epochs_no_improve}, Best Val R²: {best_val_r2:.6f}')
 
             if epochs_no_improve >= early_stopping:
                 print(f'Early stopping triggered after epoch {epoch+1} with patience {early_stopping}')
                 break
 
-        return {"best_val_loss": best_val_loss}
+        return {"best_val_r2": best_val_r2}
 
     def evaluate(self, test_sequences, test_labels, scaler):
         test_sequences_scaled = np.array([scaler.transform(seq) for seq in test_sequences])
@@ -191,14 +199,16 @@ class FatigueModelTrainer:
             sequences = sequences.to(self.device).requires_grad_(True)
             outputs = self.model(sequences)
             outputs.mean().backward()
-            feature_grads.append(sequences.grad.abs().mean(dim=[0, 1]).cpu().numpy())
+            grads = sequences.grad.abs().mean(dim=[0, 1]).cpu().numpy()
+            grads = grads / (np.max(grads) + 1e-8)  # Normalize gradients
+            feature_grads.append(grads)
             sequences.grad.zero_()
             all_preds.extend(outputs.detach().cpu().numpy().flatten())
             all_labels.extend(labels.numpy().flatten())
 
         all_preds = np.clip(all_preds, 0, 1)
         mean_grads = np.mean(feature_grads, axis=0)
-        print(f"Feature gradients: {mean_grads}")
+        print(f"Normalized feature gradients: {mean_grads}")
         wandb.log({"Feature Gradients": wandb.Histogram(mean_grads)})
         wandb.run.summary["avg_feature_gradient"] = np.mean(mean_grads)
 
@@ -231,7 +241,7 @@ class FatigueModelTrainer:
             "Actual", "Residual", title="Residuals vs Actual Fatigue"
         )})
 
-        print(f"Baseline R^2 (predicting previous label): {baseline_r2:.4f}")
+        print(f"Baseline R² (predicting previous label): {baseline_r2:.4f}")
         return metrics, all_preds, all_labels
 
     def save_model(self, filename):
@@ -246,11 +256,11 @@ class FatigueModelTrainer:
 
 def train_fatigue_model(data_dir='session_data', holdout_dir=None, save_dir='models', k_folds=None):
     wandb.init(project="fatigue_prediction_sweep", config={
-        "window_size": 40,
+        "window_size": 20,
         "overlap": 0.5,
         "learning_rate": 0.0005,
-        "dropout": 0.7,
-        "weight_decay": 1e-4,
+        "dropout": 0.2,
+        "weight_decay": 1e-5,
         "batch_size": 64,
         "epochs": 200,
         "early_stopping": 20,
