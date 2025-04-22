@@ -1,43 +1,46 @@
 program: train_fatigue_modeler_v2.py
 method: bayes
 metric:
-  name: rmse
-  goal: minimise
-early_terminate:
-  type: hyperband
-  min_iter: 10
-run_cap: 30
+  name: cv_avg_r2
+  goal: maximize
+run_cap: 20
 parameters:
   # Training Hyperparameters
   learning_rate:
-    values: [0.0001, 0.0005]
+    min: 0.0003
+    max: 0.0007
+    distribution: log_uniform_values
   batch_size:
-    values: [64, 128]
+    values: [128, 256]
   epochs:
-    values: [150, 200]
+    min: 100
+    max: 150
+    distribution: int_uniform
   early_stopping:
-    values: [15, 20]
+    value: 20
   weight_decay:
-    min: 1e-5
-    max: 1e-4
+    min: 0.00001
+    max: 0.00005
     distribution: log_uniform_values
   # Model Hyperparameters
   hidden_size:
-    values: [256, 512]
+    values: [128, 256, 512]
   num_layers:
     values: [3, 4]
   dropout:
     min: 0.1
-    max: 0.3
+    max: 0.2
     distribution: uniform
   # Data Processing Hyperparameters
   window_size:
-    values: [15, 20, 25]
+    values: [15, 25]
   overlap:
-    values: [0.4, 0.5, 0.6]
+    min: 0.5
+    max: 0.6
+    distribution: uniform
   k_folds:
-    values: [null, 5]
-description: "Sweep to achieve R² ≥ 0.80 and low RMSE with increased model capacity, lower dropout and enhanced data utilisation"
+    value: 5
+description: "Refined sweep to achieve R² ≥ 0.80 and low RMSE, focusing on robust k-fold validation, optimised model capacity and efficient training"
 command:
   - "c:\\Users\\morga\\Documents\\University\\Year 3\\Dissertation\\Code\\COMP3932_Synoptic_Project\\.venv\\Scripts\\python.exe"
   - "${program}"
