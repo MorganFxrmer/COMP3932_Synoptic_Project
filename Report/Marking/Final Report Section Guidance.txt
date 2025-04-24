@@ -1,0 +1,53 @@
+Final Report Section Guidance
+
+Background research: Have I ...
+
+Explained the problem clearly?
+Identified relevant areas for investigation and discussed them critically in the report under appropriately organised headings?
+Critically reviewed previous attempts to solve this and similar problems?
+Justified any claims made using credible primary or secondary sources?
+Justified a clearly stated aim and set of objectives and deliverables
+
+
+Methodology: Is it clear that ...
+
+An appropriately motivated problem has been defined?
+An appropriate plan is defined? This may include software development methodology or, otherwise, stages of your project that ensure delivery of a solution.
+Objective and measurable criteria are defined for evaluating the proposed solution?
+These criteria are appropriate for the problem and justified from background research?
+
+
+Implementation and Validation: Is it clear that ...
+
+The solution exists?
+I have produced the deliverables specified?
+Appropriate steps or standards were taken to ensure a quality output (e.g. design documentation, comments in code)?
+The challenges were clearly articulated?
+Appropriate and thorough tests were conducted and analysed to validate the quality of deliverables?
+
+
+Results and Discussion: Is it clear that ...
+
+Appropriate and thorough evaluation was conducted and analysed to evaluate your solution?
+Objective and measurable criteria are used for evaluating the achievement of the project against the initial problem specification?
+The criteria have been used professionally to judge whether the problem has been solved?
+Conclusions draw on the data you have produced and the objectives of the project?
+Future work considers multiple aspects of your project? For example, technical improvements, direct extensions, wider impact of the work.
+
+
+Presentation: Have I ...
+
+Given the report an appropriate title?
+Structured the report appropriately, with appendices used for peripheral content and a single references list containing only sources referred to in the report?
+Written in a style appropriate to the computing audience?
+Written in a consistent manner e.g., tense, use of acronyms, citation style?
+Conformed to the requirements for page layout, font size, page limit etc. ?
+Ensured that all material included is correctly attributed?
+
+
+Self-appraisal: Have I...
+
+Considered how my work could be extended?
+Included mature personal reflection which leads to lessons learnt?
+Suggested how the problems encountered might be avoided?
+Considered legal, social, ethical and professional issues, with justification if one or more are not relevant?

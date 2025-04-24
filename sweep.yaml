@@ -1,43 +1,47 @@
-program: train_fatigue_modeler.py
+program: train_fatigue_modeler_v2.py
 method: bayes
 metric:
-  name: val_loss
-  goal: minimize
-early_terminate:
-  type: hyperband
-  min_iter: 10
-run_cap: 25  # Limit to 25 runs
+  name: cv_avg_r2
+  goal: maximize
+run_cap: 20
 parameters:
   # Training Hyperparameters
   learning_rate:
-    values: [0.0005, 0.001, 0.005]  # Narrowed to top-performing range
-  batch_size:
-    values: [64, 128]  # Focused on larger, stable sizes
-  epochs:
-    values: [150, 200]  # Longer training from top runs
-  early_stopping:
-    values: [10, 20]  # Effective patience values
-  weight_decay:
-    min: 1e-6  # Still light regularisation
-    max: 1e-4  # Tightened from 1e-2
+    min: 0.0003
+    max: 0.0007
     distribution: log_uniform_values
-
+  batch_size:
+    values: [128, 256]
+  epochs:
+    min: 100
+    max: 150
+    distribution: int_uniform
+  early_stopping:
+    value: 20
+  weight_decay:
+    min: 0.00001
+    max: 0.00005
+    distribution: log_uniform_values
   # Model Hyperparameters
   hidden_size:
-    values: [128, 256]  # Larger sizes perform best
+    values: [128, 256, 512]
   num_layers:
-    value: 3  # Fixed at 3 (most common in top runs)
+    values: [3, 4]
   dropout:
-    min: 0.55  # Narrowed from 0.2-0.7
-    max: 0.7
+    min: 0.1
+    max: 0.2
     distribution: uniform
-
   # Data Processing Hyperparameters
   window_size:
-    values: [30, 40, 50]  # Mid-to-large windows for best performance
+    values: [10, 12, 15, 20]
   overlap:
-    min: 0.8  # Increased from 0.3 to focus on high overlap
-    max: 0.9
+    min: 0.5
+    max: 0.6
     distribution: uniform
-
-description: "Optimized sweep targeting low error rates with fewer runs"
+  k_folds:
+    value: 5
+description: "Refined sweep to achieve R² ≥ 0.80 and low RMSE, focusing on robust k-fold validation, optimised model capacity and efficient training"
+command:
+  - "c:\\Users\\morga\\Documents\\University\\Year 3\\Dissertation\\Code\\COMP3932_Synoptic_Project\\.venv\\Scripts\\python.exe"
+  - "${program}"
+  - "${args}"

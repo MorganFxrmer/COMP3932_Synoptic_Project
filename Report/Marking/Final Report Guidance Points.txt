@@ -1,0 +1,86 @@
+It is hard to under-estimate the importance of the final report; although all of your deliverables will be considered, the assessment is primarily through the report, and how this describes what you have achieved. This is particularly true for your assessor, who will be less familiar with what you've actually done than your supervisor. It is therefore important that you devote a significant fraction of your time to drafting, iterating and polishing your final report.
+
+1. Layout and format - basic requirements
+
+It is strongly recommended that you use one of the provided templates for your report. Two are provided, one for LaTeX (please read the README.txt file after unarchiving the download), and one for Word, which should also work on LibreOffice. Both are available from Forms and templates (students).
+
+If you do not use one of the templates, then the requirements are as follows: The report must be in typescript (i.e. not handwritten), on A4, with 2.5cm margins. Point size 11 and one-and-a-half line spacing should be used. Either single or double sided is acceptable, but double sided is recommended. The pages preceding the body of the text, i.e. preliminaries from "Summary" to "Table of Contents", should be sequentially numbered in Roman numerals. All the remaining pages should be numbered in a single sequence of Arabic numerals.
+
+Length: The main body of a final project report must be no longer than 30 pages. This excludes preliminaries, appendices, and references, but includes figures and tables (except those in appendices). See below for tips on meeting this page limit.
+
+Appendices: Two appendices are compulsory. Appendix A must include all of the material to be assessed under the Self-appraisal criterion in the mark scheme. For some projects, this may require summarising some of the information that is already in the main text. Appendix B must contain a list of External Materials, i.e. all materials not developed by the student, or a statement saying that there were none. Any number of further, optional appendices may be included after these two compulsory ones. Appendices do not count towards the page limit.
+
+What to include in the Final Project Report
+
+The report should include the following (see also the templates).
+
+Title page, deliverables, and declaration.
+Summary.
+Acknowledgements (optional).
+Table of contents.
+Body of the text (in chapters, sections and subsections).
+References.
+Appendix A Self-appraisal.
+Appendix B External Materials.
+Other appendices (optional).
+
+
+A discussion of legal, social, ethical and professional issues must be included in Appendix A. If relevant, any protocols followed (e.g. gathering user consent forms from user evaluations) should also be described. Even if there are no such issues for your project, you still need to justify this with specific reference to your project - do not use a generic phrase such as 'there are no ethical issues for this project' in the final report.
+
+Full program listings should not be included in the report, but may be made available to the project supervisor and assessor by e.g. providing them both with a link to an online repository which they can access. Important program fragments may be included to illustrate your work in the body of the report, but it is perfectly acceptable for a software project to contain no code listings at all.
+
+If you are using LATeX, please see the TeX FAQ page for general guidance on the use of Latex. Also, Andy Roberts, formerly a student in the School, has written a Latex Guide.
+
+3. Meeting the page limit
+
+Writing concisely is an important skill that some students will need to work on. If you are struggling to fit your report into the page limit, some ideas to consider are:
+
+Most technical reports / academic publications are iterated 10-20 times at least after the first draft is completed (your supervisor will attest to this). The final iterations in particular can result in a significant reduction in length.
+Avoid repetition. If you see nearby statements that are similar, remove one of them, or find a way to rearrange the text such that the statement is only made once. If you make the same statement in two different sections, consider to which section it properly belongs and delete the other one.
+If a statement is redundant, remove it. This may be something you wrote in an earlier draft that seemed necessary at the time, but is no longer required given the other text that has been added. Don't try to keep everything you've written just because you spent time writing it - being selective in what you include is an important skill to develop.
+Consider moving some material to appendices, especially technical details which are not essential to the message you are trying to present. Note that the appendices may not be read in detail during assessment, so material essential to the assessment, other than 'self-appraisal,' should remain in the main text.
+Focus on situations where small changes can have a big effect, such as paragraphs for which the last line is just 1-2 words, as just a few changes in such a paragraph can save a whole line. In the same way, any chapters for which the last page is mostly empty with just 1-2 lines of text are good candidates to save a whole page with minor changes.
+
+
+If, even after following these suggestions, you still feel it is impossible to reach the page limit, send an email requesting a page length extension to your supervisor and assessor, with the project coordinator cc'ed in. This will normally only be accepted in exceptional circumstances, so you will need to explain why your report requires special consideration. Marks will be deducted where students exceed the page limit without first receiving permission. Even if you are granted permission, we still reserve the right to deduct marks if, on reading the dissertation, it is clear that it could have been reduced in length without removing essential content.
+
+4. Further writing tips
+
+a) Style of language
+
+Your reports are technical documents, and like all technical documents should be written in precise, impersonal language. Do not use subjective language (`I did this...', etc.), except possibly for those aspects that are covered by the 'self-appraisal' criterion in the mark scheme. Using 'we' is, however, acceptable. For guidance, look at the articles published in academic journals that you have probably already read as part of your background research.
+
+b) Version control of your written documents
+
+To make sure you know which document is the most recent and can trace back to earlier version to retrieve deleted content if needed. It can be as simple as adding v1, v2 to the file name.
+
+c) Referencing written work and use of a reference management system
+
+Our School accepts both Harvard and Numeric style of referencing. Once you have chosen the style, it needs to be consistently applied throughout the report. There are tools that make life easier for you to manage those references.
+
+d) What to include?
+
+The following guidelines provide broad indicators of the issues that are typically considered when marking the final project report. This list is not exhaustive. You should also review the rubric for grading your project.
+
+e) Aiming high
+
+A well written and interesting report is likely to gain more marks than one that just follows the marking scheme (i.e. just ticking the boxes); in particular it will make the difference between a good project that is awarded over 70, and an excellent project that wins a prize. A well written report flows nicely, is presented logically, and is easy to understand. More time should be spent describing the challenging parts, and less time spent describing routine, or obvious, actions (though they often do need to be present). Reports that have the potential to attract a prize display a "spark" which is difficult to describe, but easy to detect; in particular it is clear to the reader that the author has fully mastered the subject.
+
+f) Other considerations
+
+Are all figures and tables referenced in the main text?
+Is the language used suitable for a technical report, or are there imprecise words like "huge", "big", "lots" etc.?
+As well as explaining your choice of methodology, library, tool etc., have you also justified why you did not adopt other options?
+Are all claims backed up by (i) evidence you provide, (ii) a self-contained justification, or (iii) a reference?
+Is there any repetition, i.e. identical or similar statements in near proximity? Finding a way to merge these will shorten your report, possibly to the extent of fitting within the page limit for the first time.
+Are there any superfluous statements that may have seemed important when you first added them, but now look redundant? Removing these can also save space (don't be afraid to remove text, not matter how long you spent composing it in the first place - it's all part of the writing process).
+Iterate, iterate, iterate! Remember, the first full draft of a report is only 50% of the way there, the rest is rearranging, pruning, and polishing.
+
+
+g) Publishing your work
+
+For exceptional projects, you may like to consider re-formatting and submitting your work to be published in an academic journal. This could strongly support any applications you make for research positions, although it is not an expectation (i.e. you can still apply for research positions without any publications - it's actually quite rare for student projects to be published, but has happened). Unfortunately we cannot provide support for this, and so this is largely down to yourself to organise - your supervisor may be willing to help out in their spare time, but this is entirely down to them.
+
+If this idea appeals to you, then there is a journal called the International Journal of Student Project Reporting (IJSPR) which "aims to publish papers based on outstanding BSc / MSc/ MRes student Projects."
+
+
