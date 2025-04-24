@@ -33,7 +33,7 @@ parameters:
     distribution: uniform
   # Data Processing Hyperparameters
   window_size:
-    values: [15, 25]
+    values: [10, 12, 15, 20]
   overlap:
     min: 0.5
     max: 0.6

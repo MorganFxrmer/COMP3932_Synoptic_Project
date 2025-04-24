@@ -1,0 +1,40 @@
+program: train_fatigue_modeler_v2.py
+method: bayes
+metric:
+  name: val_r2
+  goal: maximize
+parameters:
+  learning_rate:
+    distribution: log_uniform_values
+    min: 0.00001
+    max: 0.001
+  batch_size:
+    values: [32, 64, 128]
+  hidden_size:
+    values: [128, 256, 512]
+  dropout:
+    distribution: uniform
+    min: 0.2
+    max: 0.5
+  weight_decay:
+    distribution: log_uniform_values
+    min: 1e-6
+    max: 1e-3
+  num_layers:
+    values: [2, 3, 4]
+  window_size:
+    values: [10, 20, 40]
+  overlap:
+    values: [0.5, 0.6, 0.7, 0.8]
+  epochs:
+    value: 200
+  early_stopping:
+    value: 20
+  k_folds:
+    value: null
+  holdout_dir:
+    value: null
+command:
+  - "c:\\Users\\morga\\Documents\\University\\Year 3\\Dissertation\\Code\\COMP3932_Synoptic_Project\\.venv\\Scripts\\python.exe"
+  - "${program}"
+  - "${args}"
