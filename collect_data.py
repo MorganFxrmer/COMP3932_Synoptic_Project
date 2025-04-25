@@ -230,11 +230,6 @@ class TrainPoseEstimationApp(App):
             if angles:
                 self.mp_draw.draw_landmarks(frame, results.pose_landmarks, self.mp_pose.POSE_CONNECTIONS)
                 self.joint_tracker.update(angles, self.current_fatigue if hasattr(self, 'current_fatigue') else None, detected=True)
-                
-                y_pos = 30
-                for joint, angle in angles.items():
-                    cv2.putText(frame, f"{joint}: {angle:.1f}", (10, y_pos), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 0, 255), 2)
-                    y_pos += 20
             else:
                 self.joint_tracker.update(None, self.current_fatigue if hasattr(self, 'current_fatigue') else None, detected=False)
                 cv2.putText(frame, "Partial Detection Failed", (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
