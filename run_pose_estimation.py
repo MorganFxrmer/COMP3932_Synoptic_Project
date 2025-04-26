@@ -1,3 +1,4 @@
+import time
 import torch
 import torch.nn as nn
 import cv2
@@ -434,6 +435,9 @@ class FitnessTrainerApp(App):
         content.add_widget(analysis_panel)
         self.main_layout.add_widget(content)
         
+        # Add timer to control update frequency
+        self.last_analysis_time = 0
+
         # Setup MediaPipe and ML model
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(min_detection_confidence=0.7, min_tracking_confidence=0.7)
@@ -657,6 +661,9 @@ class FitnessTrainerApp(App):
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         results = self.pose.process(frame_rgb)
         
+        current_time = time.time()
+        update_analysis = (current_time - self.last_analysis_time) >= 5  # Check if 5 seconds have passed
+        
         if results.pose_landmarks:
             # Draw pose landmarks with better styling
             self.mp_draw.draw_landmarks(
@@ -671,10 +678,12 @@ class FitnessTrainerApp(App):
             angles = self.calculate_joint_angles(results.pose_landmarks.landmark)
             self.joint_tracker.update(angles)
             
-            # Get features and predict fatigue
+            # Get features and predict fatigue - only update the UI every 5 seconds
             features = self.joint_tracker.get_features()
-            fatigue_score = None
-            if features is not None:
+            if features is not None and update_analysis:
+                self.last_analysis_time = current_time  # Reset the timer
+                
+                # Predict fatigue and update UI
                 fatigue_score = self.predict_fatigue(features)
                 
                 # Update fatigue meter
@@ -693,39 +702,34 @@ class FitnessTrainerApp(App):
                 
                 self.status_label.text = status
                 self.status_label.color = get_color_from_hex(status_color)
-            
-            # Get form feedback and update UI
-            form_feedback = self.joint_tracker.get_form_feedback(fatigue_score)
-            posture_feedback = [f for f in form_feedback if "fatigue" not in f.lower()]
-            trainer_advice = [f for f in form_feedback if "fatigue" in f.lower()]
-            
-            # Update feedback grid
-            self.feedback_grid.clear_widgets()
-            if not posture_feedback:
-                self.feedback_grid.add_widget(FeedbackItem(text="Form looks good!", feedback_type="success"))
-            else:
-                for feedback in posture_feedback:
-                    self.feedback_grid.add_widget(FeedbackItem(text=feedback))
-            
-            # Update trainer advice grid
-            self.advice_grid.clear_widgets()
-            if not trainer_advice:
-                self.advice_grid.add_widget(FeedbackItem(text="No fatigue issues detected", feedback_type="success"))
-            else:
-                for advice in trainer_advice:
-                    self.advice_grid.add_widget(FeedbackItem(text=advice, feedback_type="warning"))
+                
+                # Get form feedback and update UI
+                form_feedback = self.joint_tracker.get_form_feedback(fatigue_score)
+                posture_feedback = [f for f in form_feedback if "fatigue" not in f.lower()]
+                trainer_advice = [f for f in form_feedback if "fatigue" in f.lower()]
+                
+                # Update feedback grid
+                self.feedback_grid.clear_widgets()
+                if not posture_feedback:
+                    self.feedback_grid.add_widget(FeedbackItem(text="Form looks good!", feedback_type="success"))
+                else:
+                    for feedback in posture_feedback:
+                        self.feedback_grid.add_widget(FeedbackItem(text=feedback))
+                
+                # Update trainer advice grid
+                self.advice_grid.clear_widgets()
+                if not trainer_advice:
+                    self.advice_grid.add_widget(FeedbackItem(text="No fatigue issues detected", feedback_type="success"))
+                else:
+                    for advice in trainer_advice:
+                        self.advice_grid.add_widget(FeedbackItem(text=advice, feedback_type="warning"))
 
-            # Add animation to pose detection outline
-            # Apply a subtle highlight effect to the frame
-            highlight = np.ones_like(frame) * 255
-            overlay = cv2.addWeighted(frame, 0.9, highlight, 0.1, 0)
-            
-            # Draw a semi-transparent overlay on the bottom with exercise info
+            # Add animation to pose detection outline and bottom info bar
+            # This part still runs every frame
             h, w = frame.shape[:2]
             overlay_height = int(h * 0.1)
             overlay_y = h - overlay_height
             
-            # Add movement quality indicator
             if features is not None:
                 velocities = features[:, 19:38]
                 avg_velocity = np.mean(np.abs(velocities[-5:]))
@@ -739,22 +743,25 @@ class FitnessTrainerApp(App):
                 # Create an info bar at the bottom
                 cv2.rectangle(frame, (0, overlay_y), (w, h), (40, 40, 40), -1)
                 cv2.putText(frame, f"Movement: {movement_quality}", (10, h - 10), 
-                          cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
                 
-                # Add fatigue level indicator
-                if fatigue_score is not None:
-                    fatigue_text = f"Fatigue: {fatigue_score:.2f}"
+                # Add fatigue level indicator (showing the last calculated value)
+                if hasattr(self, 'fatigue_meter') and self.fatigue_meter:
+                    current_fatigue = self.fatigue_meter.progress_rect.size[0] / self.fatigue_meter.width
+                    fatigue_text = f"Fatigue: {current_fatigue:.2f}"
                     cv2.putText(frame, fatigue_text, (w - 150, h - 10), 
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
         else:
-            # No pose detected
-            self.feedback_grid.clear_widgets()
-            self.feedback_grid.add_widget(FeedbackItem(text="No person detected", feedback_type="info"))
-            self.advice_grid.clear_widgets()
-            self.advice_grid.add_widget(FeedbackItem(text="Please stand in frame", feedback_type="info"))
-            self.fatigue_meter.set_value(0)
+            # No pose detected - only update UI every 5 seconds to avoid flickering
+            if update_analysis:
+                self.last_analysis_time = current_time
+                self.feedback_grid.clear_widgets()
+                self.feedback_grid.add_widget(FeedbackItem(text="No person detected", feedback_type="info"))
+                self.advice_grid.clear_widgets()
+                self.advice_grid.add_widget(FeedbackItem(text="Please stand in frame", feedback_type="info"))
+                self.fatigue_meter.set_value(0)
         
-        # Convert to texture for Kivy
+        # Convert to texture for Kivy - this runs every frame
         buf = cv2.flip(frame, 0).tobytes()
         texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
         texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
