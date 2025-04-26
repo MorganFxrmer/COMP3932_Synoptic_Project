@@ -26,6 +26,9 @@ from kivy.uix.behaviors import ButtonBehavior
 from kivy.uix.floatlayout import FloatLayout
 from kivy.uix.relativelayout import RelativeLayout
 from kivy.animation import Animation
+from kivymd.icon_definitions import md_icons
+from kivymd.uix.label import MDIcon
+from kivymd.app import MDApp
 
 # Define custom color palette
 COLORS = {
@@ -118,7 +121,7 @@ class JointAngleTracker:
         return feedback if feedback else ["Form looks good; keep it up!"]
 
 class IconButton(ButtonBehavior, BoxLayout):
-    def __init__(self, text="", icon="", **kwargs):
+    def __init__(self, text="", icon_name="", **kwargs):
         super(IconButton, self).__init__(**kwargs)
         self.orientation = 'vertical'
         self.padding = dp(5)
@@ -128,12 +131,23 @@ class IconButton(ButtonBehavior, BoxLayout):
             self.background_color = Color(*get_color_from_hex(COLORS['primary']))
             self.background = RoundedRectangle(pos=self.pos, size=self.size, radius=[dp(10)])
         
-        self.icon_label = Label(text=icon, font_size=dp(24), size_hint=(1, 0.7), 
-                               color=get_color_from_hex(COLORS['text_light']))
-        self.text_label = Label(text=text, font_size=dp(14), size_hint=(1, 0.3),
-                               color=get_color_from_hex(COLORS['text_light']))
+        # Create icon from Material Design icons
+        self.icon = MDIcon(
+            icon=icon_name,
+            halign='center',
+            size_hint=(1, 0.7),
+            theme_text_color="Custom",
+            text_color=get_color_from_hex(COLORS['text_light'])
+        )
         
-        self.add_widget(self.icon_label)
+        self.text_label = Label(
+            text=text, 
+            font_size=dp(14), 
+            size_hint=(1, 0.3),
+            color=get_color_from_hex(COLORS['text_light'])
+        )
+        
+        self.add_widget(self.icon)
         self.add_widget(self.text_label)
         
         self.bind(pos=self._update_rect, size=self._update_rect)
@@ -144,16 +158,14 @@ class IconButton(ButtonBehavior, BoxLayout):
         
     def on_press(self):
         anim = Animation(color=[0.8, 0.8, 0.8, 1], duration=0.1)
-        anim.start(self.icon_label)
         anim.start(self.text_label)
         
     def on_release(self):
         anim = Animation(color=[1, 1, 1, 1], duration=0.1)
-        anim.start(self.icon_label)
         anim.start(self.text_label)
 
 class CardView(BoxLayout):
-    def __init__(self, title="", icon="", **kwargs):
+    def __init__(self, title="", icon_name="", **kwargs):
         super(CardView, self).__init__(**kwargs)
         self.orientation = 'vertical'
         self.padding = dp(15)
@@ -172,10 +184,15 @@ class CardView(BoxLayout):
         # Header with title and icon
         header = BoxLayout(orientation='horizontal', size_hint=(1, 0.2))
         
-        if icon:
-            icon_label = Label(text=icon, font_size=dp(24), size_hint=(0.15, 1),
-                              color=get_color_from_hex(COLORS['primary']))
-            header.add_widget(icon_label)
+        if icon_name:
+            self.icon = MDIcon(
+                icon=icon_name,
+                halign='center',
+                size_hint=(0.15, 1),
+                theme_text_color="Custom",
+                text_color=get_color_from_hex(COLORS['primary'])
+            )
+            header.add_widget(self.icon)
         
         title_label = Label(text=title, font_size=dp(18), halign='left', 
                           color=get_color_from_hex(COLORS['text_dark']),
@@ -209,19 +226,20 @@ class FeedbackItem(BoxLayout):
         self.spacing = dp(10)
         
         # Set the appropriate icon and color based on feedback type
-        icon = "•"
+        icon_name = "information-outline"
         color = COLORS['primary']
         
         if "moderate fatigue" in text.lower():
-            icon = "!"
+            icon_name = "alert-circle-outline"
             color = COLORS['warning']
         elif "high fatigue" in text.lower():
-            icon = "!!"
+            icon_name = "alert-outline"
             color = COLORS['danger']
         elif "adjust" in text.lower() or "avoid" in text.lower():
+            icon_name = "alert-circle-outline"
             color = COLORS['warning']
         elif "good" in text.lower() or "keep it up" in text.lower():
-            icon = "✓"
+            icon_name = "check-circle-outline"
             color = COLORS['secondary']
             
         with self.canvas.before:
@@ -235,9 +253,13 @@ class FeedbackItem(BoxLayout):
             self.icon_bg = RoundedRectangle(pos=icon_box.pos, size=icon_box.size, 
                                           radius=[dp(5), 0, 0, dp(5)])
             
-        icon_label = Label(text=icon, color=get_color_from_hex(COLORS['text_light']), 
-                         font_size=dp(18), bold=True)
-        icon_box.add_widget(icon_label)
+        icon = MDIcon(
+            icon=icon_name,
+            halign='center',
+            theme_text_color="Custom",
+            text_color=get_color_from_hex(COLORS['text_light'])
+        )
+        icon_box.add_widget(icon)
         icon_box.bind(pos=self._update_icon_bg, size=self._update_icon_bg)
         
         self.add_widget(icon_box)
@@ -320,7 +342,7 @@ class CustomProgressBar(BoxLayout):
         self.progress_rect.pos = instance.pos
         self.progress_rect.size = [instance.width * current_value, instance.height]
 
-class FitnessTrainerApp(App):
+class FitnessTrainerApp(MDApp):
     def build(self):
         Window.clearcolor = get_color_from_hex(COLORS['background'])
         
@@ -357,7 +379,7 @@ class FitnessTrainerApp(App):
         video_panel = BoxLayout(orientation='vertical', size_hint_x=0.65, spacing=dp(10))
         
         # Video feed card
-        video_card = CardView(title="Live Analysis", icon="▶")
+        video_card = CardView(title="Live Analysis", icon_name="video")
         self.image = Image()
         video_card.add_to_content(self.image)
         video_panel.add_widget(video_card)
@@ -366,17 +388,17 @@ class FitnessTrainerApp(App):
         button_row = BoxLayout(orientation='horizontal', size_hint_y=0.15, spacing=dp(10))
         
         # Camera button
-        self.camera_button = IconButton(text="Start Camera", icon="📷", 
-                                     on_press=self.start_camera)
+        self.camera_button = IconButton(text="Start Camera", icon_name="camera", 
+                             on_press=self.start_camera)
         button_row.add_widget(self.camera_button)
         
         # Load video button
-        self.load_button = IconButton(text="Load Video", icon="📁", 
+        self.load_button = IconButton(text="Load Video", icon_name="folder", 
                                     on_press=self.show_file_chooser)
         button_row.add_widget(self.load_button)
         
         # Stop button - with different color
-        self.stop_button = IconButton(text="Stop", icon="⏹")
+        self.stop_button = IconButton(text="Stop", icon_name="stop")
         with self.stop_button.canvas.before:
             self.stop_button.background_color = Color(*get_color_from_hex(COLORS['danger']))
         self.stop_button.bind(on_press=self.stop_capture)
@@ -389,7 +411,7 @@ class FitnessTrainerApp(App):
         analysis_panel = BoxLayout(orientation='vertical', size_hint_x=0.35, spacing=dp(10))
         
         # Fatigue meter card
-        fatigue_card = CardView(title="Fatigue Analysis", icon="📊")
+        fatigue_card = CardView(title="Fatigue Analysis", icon_name="chart-line")
         
         # Fatigue progress bar
         self.fatigue_layout = BoxLayout(orientation='vertical', padding=[dp(10), dp(5)])
@@ -405,7 +427,7 @@ class FitnessTrainerApp(App):
         analysis_panel.add_widget(fatigue_card)
         
         # Form feedback card
-        form_card = CardView(title="Form Analysis", icon="📝")
+        form_card = CardView(title="Form Analysis", icon_name="clipboard-text")
         
         self.feedback_scroll = ScrollView(do_scroll_x=False)
         self.feedback_grid = GridLayout(cols=1, spacing=dp(8), size_hint_y=None, padding=dp(5))
@@ -419,7 +441,7 @@ class FitnessTrainerApp(App):
         analysis_panel.add_widget(form_card)
         
         # Trainer advice card
-        trainer_card = CardView(title="Trainer Recommendations", icon="🔔")
+        trainer_card = CardView(title="Trainer Recommendations", icon_name="bell")
         
         self.advice_scroll = ScrollView(do_scroll_x=False)
         self.advice_grid = GridLayout(cols=1, spacing=dp(8), size_hint_y=None, padding=dp(5))
