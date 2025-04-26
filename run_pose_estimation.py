@@ -536,7 +536,15 @@ class FitnessTrainerApp(MDApp):
             self.is_video_file = True
             self.status_label.text = "Analyzing Video"
             self.status_label.color = get_color_from_hex(COLORS['primary'])
-            self.event = Clock.schedule_interval(self.update, 1.0/30.0)
+            
+            # Get the video's frame rate
+            video_fps = self.capture.get(cv2.CAP_PROP_FPS)
+            if video_fps <= 0:  # Fallback in case FPS is invalid
+                video_fps = 30.0
+            frame_interval = 1.0 / video_fps
+            
+            # Schedule update based on video's frame rate
+            self.event = Clock.schedule_interval(self.update, frame_interval)
             self.popup.dismiss()
     
     def calculate_angle(self, joint1, joint2, joint3):
@@ -681,12 +689,18 @@ class FitnessTrainerApp(MDApp):
         
         # Convert to RGB for MediaPipe
         frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        results = self.pose.process(frame_rgb)
+        
+        # Process pose estimation every other frame to reduce load
+        self.frame_counter = getattr(self, 'frame_counter', 0) + 1
+        if self.frame_counter % 1 == 0:  # Process every frame
+            results = self.pose.process(frame_rgb)
+        else:
+            results = None  # Skip pose processing
         
         current_time = time.time()
-        update_analysis = (current_time - self.last_analysis_time) >= 5  # Check if 5 seconds have passed
+        update_analysis = (current_time - self.last_analysis_time) >= 5
         
-        if results.pose_landmarks:
+        if results and results.pose_landmarks:
             # Draw pose landmarks with better styling
             self.mp_draw.draw_landmarks(
                 frame, 
@@ -700,90 +714,56 @@ class FitnessTrainerApp(MDApp):
             angles = self.calculate_joint_angles(results.pose_landmarks.landmark)
             self.joint_tracker.update(angles)
             
-            # Get features and predict fatigue - only update the UI every 5 seconds
-            features = self.joint_tracker.get_features()
-            if features is not None and update_analysis:
-                self.last_analysis_time = current_time  # Reset the timer
-                
-                # Predict fatigue and update UI
-                fatigue_score = self.predict_fatigue(features)
-                
-                # Update fatigue meter
-                self.fatigue_meter.set_value(fatigue_score)
-                
-                # Update status based on fatigue level
-                if fatigue_score < 0.3:
-                    status = "Normal"
-                    status_color = COLORS['secondary']
-                elif fatigue_score < 0.7:
-                    status = "Caution"
-                    status_color = COLORS['warning']
-                else:
-                    status = "High Fatigue"
-                    status_color = COLORS['danger']
-                
-                self.status_label.text = status
-                self.status_label.color = get_color_from_hex(status_color)
-                
-                # Get form feedback and update UI
-                form_feedback = self.joint_tracker.get_form_feedback(fatigue_score)
-                posture_feedback = [f for f in form_feedback if "fatigue" not in f.lower()]
-                trainer_advice = [f for f in form_feedback if "fatigue" in f.lower()]
-                
-                # Update feedback grid
-                self.feedback_grid.clear_widgets()
-                if not posture_feedback:
-                    self.feedback_grid.add_widget(FeedbackItem(text="Form looks good!", feedback_type="success"))
-                else:
-                    for feedback in posture_feedback:
-                        self.feedback_grid.add_widget(FeedbackItem(text=feedback))
-                
-                # Update trainer advice grid
-                self.advice_grid.clear_widgets()
-                if not trainer_advice:
-                    self.advice_grid.add_widget(FeedbackItem(text="No fatigue issues detected", feedback_type="success"))
-                else:
-                    for advice in trainer_advice:
-                        self.advice_grid.add_widget(FeedbackItem(text=advice, feedback_type="warning"))
-
-            # Add animation to pose detection outline and bottom info bar
-            # This part still runs every frame
-            h, w = frame.shape[:2]
-            overlay_height = int(h * 0.1)
-            overlay_y = h - overlay_height
-            
-            if features is not None:
-                velocities = features[:, 19:38]
-                avg_velocity = np.mean(np.abs(velocities[-5:]))
-                
-                movement_quality = "Good"
-                if avg_velocity < 5:
-                    movement_quality = "Slow"
-                elif avg_velocity > 15:
-                    movement_quality = "Fast"
-                
-                # Create an info bar at the bottom
-                cv2.rectangle(frame, (0, overlay_y), (w, h), (40, 40, 40), -1)
-                cv2.putText(frame, f"Movement: {movement_quality}", (10, h - 10), 
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-                
-                # Add fatigue level indicator (showing the last calculated value)
-                if hasattr(self, 'fatigue_meter') and self.fatigue_meter:
-                    current_fatigue = self.fatigue_meter.progress_rect.size[0] / self.fatigue_meter.width
-                    fatigue_text = f"Fatigue: {current_fatigue:.2f}"
-                    cv2.putText(frame, fatigue_text, (w - 150, h - 10), 
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
-        else:
-            # No pose detected - only update UI every 5 seconds to avoid flickering
+            # Get features and predict fatigue
             if update_analysis:
                 self.last_analysis_time = current_time
-                self.feedback_grid.clear_widgets()
-                self.feedback_grid.add_widget(FeedbackItem(text="No person detected", feedback_type="info"))
-                self.advice_grid.clear_widgets()
-                self.advice_grid.add_widget(FeedbackItem(text="Please stand in frame", feedback_type="info"))
-                self.fatigue_meter.set_value(0)
+                features = self.joint_tracker.get_features()
+                if features is not None:
+                    fatigue_score = self.predict_fatigue(features)
+                    self.fatigue_meter.set_value(fatigue_score)
+                    
+                    # Update status based on fatigue level
+                    if fatigue_score < 0.3:
+                        status = "Normal"
+                        status_color = COLORS['secondary']
+                    elif fatigue_score < 0.7:
+                        status = "Caution"
+                        status_color = COLORS['warning']
+                    else:
+                        status = "High Fatigue"
+                        status_color = COLORS['danger']
+                    
+                    self.status_label.text = status
+                    self.status_label.color = get_color_from_hex(status_color)
+                    
+                    # Get form feedback and update UI
+                    form_feedback = self.joint_tracker.get_form_feedback(fatigue_score)
+                    posture_feedback = [f for f in form_feedback if "fatigue" not in f.lower()]
+                    trainer_advice = [f for f in form_feedback if "fatigue" in f.lower()]
+                    
+                    self.feedback_grid.clear_widgets()
+                    if not posture_feedback:
+                        self.feedback_grid.add_widget(FeedbackItem(text="Form looks good!", feedback_type="success"))
+                    else:
+                        for feedback in posture_feedback:
+                            self.feedback_grid.add_widget(FeedbackItem(text=feedback))
+                    
+                    self.advice_grid.clear_widgets()
+                    if not trainer_advice:
+                        self.advice_grid.add_widget(FeedbackItem(text="No fatigue issues detected", feedback_type="success"))
+                    else:
+                        for advice in trainer_advice:
+                            self.advice_grid.add_widget(FeedbackItem(text=advice, feedback_type="warning"))
         
-        # Convert to texture for Kivy - this runs every frame
+        elif update_analysis:
+            self.last_analysis_time = current_time
+            self.feedback_grid.clear_widgets()
+            self.feedback_grid.add_widget(FeedbackItem(text="No person detected", feedback_type="info"))
+            self.advice_grid.clear_widgets()
+            self.advice_grid.add_widget(FeedbackItem(text="Please stand in frame", feedback_type="info"))
+            self.fatigue_meter.set_value(0)
+        
+        # Convert to texture for Kivy
         buf = cv2.flip(frame, 0).tobytes()
         texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
         texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
