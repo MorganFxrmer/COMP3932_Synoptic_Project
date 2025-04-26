@@ -194,9 +194,19 @@ class CardView(BoxLayout):
             )
             header.add_widget(self.icon)
         
-        title_label = Label(text=title, font_size=dp(18), halign='left', 
-                          color=get_color_from_hex(COLORS['text_dark']),
-                          bold=True, size_hint=(0.85, 1), text_size=(self.width, None))
+        title_label = Label(
+            text=title, 
+            font_size=dp(18), 
+            halign='left', 
+            color=get_color_from_hex(COLORS['text_dark']),
+            bold=True, 
+            size_hint=(0.85, 1), 
+            text_size=(None, None),  # Allow dynamic width
+            shorten=False,           # Prevent text truncation
+            max_lines=2,             # Allow wrapping to two lines
+            markup=True
+        )
+        title_label.bind(width=lambda instance, value: setattr(instance, 'text_size', (value * 0.95, None)))
         header.add_widget(title_label)
         
         self.add_widget(header)
@@ -265,9 +275,18 @@ class FeedbackItem(BoxLayout):
         self.add_widget(icon_box)
         
         # Feedback text
-        text_label = Label(text=text, color=get_color_from_hex(COLORS['text_dark']),
-                         size_hint=(0.9, 1), text_size=(None, None),
-                         halign='left', valign='middle')
+        text_label = Label(
+            text=text, 
+            color=get_color_from_hex(COLORS['text_dark']),
+            size_hint=(0.9, 1), 
+            text_size=(None, None),
+            halign='left', 
+            valign='middle',
+            shorten=False,           # Prevent text truncation
+            max_lines=0,             # Allow unlimited lines for wrapping
+            markup=True
+        )
+        text_label.bind(width=lambda instance, value: setattr(instance, 'text_size', (value * 0.95, None)))
         self.add_widget(text_label)
         
         self.bind(pos=self._update_rect, size=self._update_rect)
