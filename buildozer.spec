@@ -1,10 +1,10 @@
 [app]
 
 # (str) Title of your application
-title = Pose Estimation App
+title = AI Fitness Trainer App
 
 # (str) Package name
-package.name = PoseEstimationApp
+package.name = FitnessTrainerApp()
 
 # (str) Package domain (needed for android/ios packaging)
 package.domain = org.test

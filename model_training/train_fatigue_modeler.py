@@ -254,7 +254,7 @@ class FatigueModelTrainer:
         }
         torch.save(model_info, filename)
 
-def train_fatigue_model(data_dir='dataset/train_and_val_data', holdout_dir=None, save_dir='models', k_folds=None):
+def train_fatigue_model(data_dir='./dataset/train_and_val_data', holdout_dir=None, save_dir='./models', k_folds=None):
     wandb.init(project="fatigue_prediction_sweep", config={
         "window_size": 20,
         "overlap": 0.5,
