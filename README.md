@@ -109,7 +109,7 @@ To run the AI Fitness Trainer on your local machine:
 
 2. **Run the Application:**
    ```bash
-   python run_pose_estimation.py
+   python ai_fitness_trainer.py
    ```
 
 3. **Interact with the Application:**
@@ -242,7 +242,7 @@ COMP3932_SYNOPTIC_PROJECT/
 ├── models/
 │   ├── best_model.pt        # Pretrained LSTM model
 │   └── scaler.pt            # Pretrained scaler
-├── run_pose_estimation.py   # Main application script
+├── ai_fitness_trainer.py    # Main application script
 ├── requirements.txt         # Python dependencies
 ├── buildozer.spec           # Buildozer configuration (generated)
 ├── latency_log.txt          # Runtime latency logs (generated)
