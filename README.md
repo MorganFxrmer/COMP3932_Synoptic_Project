@@ -9,7 +9,7 @@ This repository contains the source code for AI Fitness Trainer, a Kivy-based Py
 - **Form Analysis**: Provides feedback on exercise form, including symmetry and posture corrections
 - **User Interface**: Built with Kivy and KivyMD, featuring a UI with live video feed, fatigue meter, and feedback panels
 - **Input Options**: Supports live camera input or video file analysis
-- **Customizable**: Includes a custom color palette and material design-inspired components
+- **Customisable**: Includes a custom color palette and material design-inspired components
 
 ## Prerequisites
 
