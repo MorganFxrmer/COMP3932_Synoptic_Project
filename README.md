@@ -19,14 +19,14 @@ Before setting up the project, ensure you have the following installed:
 - pip (Python package manager)
 - Git (for cloning the repository)
 - Virtualenv (for creating isolated Python environments)
-- Buildozer (for Android APK compilation, optional if not targeting Android)
+- Buildozer (for Android APK compilation, optional)
 - A compatible operating system:
   - Windows, Linux, or macOS for development and running the app
   - Linux (Ubuntu recommended) for compiling Android APKs with Buildozer
 - A webcam (for live camera input) or video files (.mp4, .avi, .mov) for analysis
 - A pretrained model (`best_model.pt`) and scaler (`scaler.pt`) for fatigue prediction
 
-For Android compilation:
+For Optional Android compilation:
 
 - Docker (optional, for Buildozer in a containerized environment)
 - Java Development Kit (JDK) (version 11 recommended)
@@ -119,7 +119,7 @@ To run the AI Fitness Trainer on your local machine:
    - Click **Stop** to halt the capture process
    - Monitor the Fatigue Meter, Form Analysis, and Trainer Recommendations panels for real-time feedback
 
-## Compiling to Android APK with Buildozer
+## Compiling to Android APK with Buildozer (Optional)
 
 To compile the application into an Android APK, use Buildozer. This process requires a Linux environment (Ubuntu recommended) or a Linux-based Docker container. Follow these steps:
 
