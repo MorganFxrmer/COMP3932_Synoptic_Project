@@ -119,10 +119,6 @@ To run the AI Fitness Trainer on your local machine:
    - Click **Stop** to halt the capture process
    - Monitor the Fatigue Meter, Form Analysis, and Trainer Recommendations panels for real-time feedback
 
-**Log Files:**
-- The application generates a `latency_log.txt` file in the project root to record performance metrics
-- Ensure write permissions in the project directory to avoid errors
-
 ## Compiling to Android APK with Buildozer
 
 To compile the application into an Android APK, use Buildozer. This process requires a Linux environment (Ubuntu recommended) or a Linux-based Docker container. Follow these steps:
