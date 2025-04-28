@@ -1,46 +1,35 @@
 program: train_fatigue_modeler_v2.py
-method: bayes
+method: grid
 metric:
   name: cv_avg_r2
   goal: maximize
-run_cap: 20
 parameters:
   # Training Hyperparameters
   learning_rate:
-    min: 0.0003
-    max: 0.0007
-    distribution: log_uniform_values
+    value: 0.0004900526689619263
   batch_size:
-    values: [128, 256]
+    value: 256
   epochs:
-    min: 100
-    max: 150
-    distribution: int_uniform
+    value: 105
   early_stopping:
     value: 20
   weight_decay:
-    min: 0.00001
-    max: 0.00005
-    distribution: log_uniform_values
+    value: 0.000012880908675667498
   # Model Hyperparameters
   hidden_size:
-    values: [128, 256, 512]
+    value: 128
   num_layers:
-    values: [3, 4]
+    value: 4
   dropout:
-    min: 0.1
-    max: 0.2
-    distribution: uniform
+    value: 0.3504086411385897
   # Data Processing Hyperparameters
   window_size:
-    values: [10, 12, 15, 20]
+    value: 12
   overlap:
-    min: 0.5
-    max: 0.6
-    distribution: uniform
+    value: 0.6468712441425164
   k_folds:
     value: 5
-description: "Refined sweep to achieve R² ≥ 0.80 and low RMSE, focusing on robust k-fold validation, optimised model capacity and efficient training"
+description: "Fixed configuration from dainty-sweep-3 with 5-fold cross-validation to validate R² ≥ 0.80 and low RMSE, ensuring metrics are robust and not a one-off occurrence"
 command:
   - "c:\\Users\\morga\\Documents\\University\\Year 3\\Dissertation\\Code\\COMP3932_Synoptic_Project\\.venv\\Scripts\\python.exe"
   - "${program}"

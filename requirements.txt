@@ -1,6 +1,7 @@
 opencv-python
 mediapipe
 kivy
+kivymd
 numpy
 torch
 pandas
