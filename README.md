@@ -1,6 +1,6 @@
 # AI Fitness Trainer
 
-This repository contains the source code for AI Fitness Trainer, a Kivy-based Python application that uses MediaPipe for pose estimation and an LSTM model to analyze exercise form and predict fatigue levels. The application provides real-time feedback on exercise form and fatigue, with a user-friendly interface for both live camera input and video file analysis.
+This repository contains the source code for AI Fitness Trainer, a Kivy-based Python application that uses MediaPipe for pose estimation and an LSTM model to analyse exercise form and predict fatigue levels. The application provides real-time feedback on exercise form and fatigue, with a user-friendly interface for both live camera input and video file analysis.
 
 ## Features
 
