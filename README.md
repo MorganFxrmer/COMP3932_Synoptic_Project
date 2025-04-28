@@ -40,7 +40,7 @@ To avoid dependency conflicts, set up a Python virtual environment:
 1. **Clone the Repository:**
    ```bash
    git clone https://github.com/your-username/this-repository
-   cd ai-fitness-trainer
+   cd this-repository
    ```
 
 2. **Create a Virtual Environment:**
