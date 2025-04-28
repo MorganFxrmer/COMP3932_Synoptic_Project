@@ -28,7 +28,7 @@ Before setting up the project, ensure you have the following installed:
 
 For Optional Android compilation:
 
-- Docker (optional, for Buildozer in a containerized environment)
+- Docker (optional, for Buildozer in a containerised environment)
 - Java Development Kit (JDK) (version 11 recommended)
 - Android SDK (installed via Buildozer or manually)
 - NDK (Android Native Development Kit, specific version required by Buildozer)
@@ -148,7 +148,7 @@ To compile the application into an Android APK, use Buildozer. This process requ
 
 ### Step 2: Create a Buildozer Spec File
 
-1. **Initialize Buildozer:**
+1. **Initialise Buildozer:**
    In the project root, run:
    ```bash
    buildozer init
