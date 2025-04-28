@@ -533,20 +533,6 @@ class FitnessTrainerApp(MDApp):
         self.mp_draw = mp.solutions.drawing_utils
         self.joint_tracker = JointAngleTracker()
         
-        # Set up CSV for latency logging
-        self.csv_file = open("component_latency_log.csv", "w", newline='')
-        self.csv_writer = csv.writer(self.csv_file)
-        self.csv_writer.writerow([
-            'Frame', 
-            'Total_Latency_ms', 
-            'Frame_Processing_ms', 
-            'Pose_Detection_ms', 
-            'Angle_Calculation_ms', 
-            'Feature_Extraction_ms', 
-            'Model_Prediction_ms', 
-            'UI_Update_ms'
-        ])
-        
         # Load pretrained model
         if os.path.exists('models/best_model.pt') and os.path.exists('models/scaler.pt'):
             model_info = torch.load('models/best_model.pt', map_location='cpu', weights_only=False)
@@ -786,18 +772,6 @@ class FitnessTrainerApp(MDApp):
         t_end = time.perf_counter()
         model_time = (t_end - t_start) * 1000  # ms
         
-        # Log prediction stats
-        self.csv_writer.writerow([
-            self.frame_counter,
-            0,  # Placeholder for total latency
-            0,  # Placeholder for frame processing
-            0,  # Placeholder for pose detection
-            0,  # Placeholder for angle calculation
-            0,  # Placeholder for feature extraction 
-            model_time,
-            0   # Placeholder for UI update
-        ])
-        
         return pred
 
     def update(self, dt):
@@ -951,23 +925,7 @@ class FitnessTrainerApp(MDApp):
         texture = Texture.create(size=(frame.shape[1], frame.shape[0]), colorfmt='bgr')
         texture.blit_buffer(buf, colorfmt='bgr', bufferfmt='ubyte')
         self.image.texture = texture
-        
-        # End timing and calculate latency
-        end_time = time.perf_counter()
-        total_latency_ms = (end_time - start_time) * 1000  # Convert to milliseconds
-        
-        # Log component latencies to CSV
-        if process_this_frame and update_analysis:
-            self.csv_writer.writerow([
-                self.frame_counter,
-                total_latency_ms,
-                frame_process_time,
-                pose_time,
-                angles_time,
-                features_time,
-                0,  # Model prediction time logged separately
-                ui_time
-            ])
+    
 
     def start_camera(self, instance):
         """Start capturing from camera

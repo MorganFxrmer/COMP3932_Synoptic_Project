@@ -334,9 +334,8 @@ class TrainPoseEstimationApp(App):
         if self.capture:
             self.capture.release()
         self.capture = None
-        self.is_video_mode = False  # Still reset this, but it won’t affect saving
+        self.is_video_mode = False
         self.is_running = False
-        # Don’t reset video_filename here
         self.status_label.text = 'Status: Stopped'
     
     def on_stop(self):
