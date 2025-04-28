@@ -241,7 +241,6 @@ COMP3932_SYNOPTIC_PROJECT/
 ├── ai_fitness_trainer.py    # Main application script
 ├── requirements.txt         # Python dependencies
 ├── buildozer.spec           # Buildozer configuration (generated)
-├── latency_log.txt          # Runtime latency logs (generated)
 └── bin/                     # Compiled APKs (generated)
 ```
 
