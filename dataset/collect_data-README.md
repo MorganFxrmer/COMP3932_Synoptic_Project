@@ -1,4 +1,4 @@
-# Joint Angle Dataset Collection App
+# Joint Angle and Fatigue Dataset Collection App
 
 This Python application was developed to collect joint angle and fatigue data for supervised machine learning. It was used to generate the custom dataset included in this repository for a real-time fatigue prediction system based on pose estimation.
 
