@@ -77,7 +77,7 @@ class JointAngleTracker:
             'neck', 'left_spine', 'right_spine', 'left_hip_torso', 'right_hip_torso',
             'left_shoulder_torso', 'right_shoulder_torso'
         ]
-        # Initialize deques to store angle history for each joint
+        # Initialise deques to store angle history for each joint
         self.joint_angles = {joint: deque(maxlen=window_size) for joint in self.joints}
     
     def update(self, angles_dict):
@@ -393,17 +393,21 @@ class CustomProgressBar(BoxLayout):
         
     def set_value(self, value):
         """Set progress bar value and update color based on value"""
-        value = max(0, min(1, value))  # Clamp value between 0 and 1
+        # Clamp value between 0 and 1
+        value = max(0, min(1, value)) 
         self.progress_rect.size = [self.width * value, self.progress_rect.size[1]]
         self.value_label.text = f"{int(value * 100)}%"
         
         # Set color based on value range
         if value < 0.3:
-            color = get_color_from_hex(COLORS['secondary'])  # Green for low values
+            # Green for low values
+            color = get_color_from_hex(COLORS['secondary'])  
         elif value < 0.7:
-            color = get_color_from_hex(COLORS['warning'])    # Orange for medium values
+            # Orange for medium values
+            color = get_color_from_hex(COLORS['warning'])    
         else:
-            color = get_color_from_hex(COLORS['danger'])     # Red for high values
+            # Red for high values
+            color = get_color_from_hex(COLORS['danger'])     
         self.progress_color.rgba = color
         
     def _update_bars(self, instance, value):
@@ -523,11 +527,11 @@ class FitnessTrainerApp(MDApp):
         content.add_widget(analysis_panel)
         self.main_layout.add_widget(content)
         
-        # Initialize processing variables
+        # Initialise processing variables
         self.last_analysis_time = 0
         self.frame_counter = 0
 
-        # Initialize MediaPipe pose detection
+        # Initialise MediaPipe pose detection
         self.mp_pose = mp.solutions.pose
         self.pose = self.mp_pose.Pose(min_detection_confidence=0.7, min_tracking_confidence=0.7)
         self.mp_draw = mp.solutions.drawing_utils
@@ -760,7 +764,7 @@ class FitnessTrainerApp(MDApp):
         # Start timing
         t_start = time.perf_counter()
         
-        # Normalize features using pre-trained scaler
+        # Normalise features using pre-trained scaler
         scaled_features = self.scaler.transform(features)
         
         # Make prediction with no gradient calculation
@@ -940,7 +944,7 @@ class FitnessTrainerApp(MDApp):
         self.status_label.color = get_color_from_hex(COLORS['primary'])
         self.event = Clock.schedule_interval(self.update, 1.0/30.0)
         
-        # Initialize tracking variables
+        # Initialise tracking variables
         self.frame_counter = 0
         self.frame_latencies = []
         self.last_analysis_time = 0
