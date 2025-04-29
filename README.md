@@ -1,6 +1,6 @@
 # AI Fitness Trainer
 
-This repository contains the source code for AI Fitness Trainer, a Kivy-based Python application that uses MediaPipe for pose estimation and an LSTM model to analyze exercise form and predict fatigue levels. The application provides real-time feedback on exercise form and fatigue, with a user-friendly interface for both live camera input and video file analysis.
+This repository contains the source code for AI Fitness Trainer, a Kivy-based Python application that uses MediaPipe for pose estimation and an LSTM model to analyse exercise form and predict fatigue levels. The application provides real-time feedback on exercise form and fatigue, with a user-friendly interface for both live camera input and video file analysis.
 
 ## Features
 
@@ -9,7 +9,7 @@ This repository contains the source code for AI Fitness Trainer, a Kivy-based Py
 - **Form Analysis**: Provides feedback on exercise form, including symmetry and posture corrections
 - **User Interface**: Built with Kivy and KivyMD, featuring a UI with live video feed, fatigue meter, and feedback panels
 - **Input Options**: Supports live camera input or video file analysis
-- **Customizable**: Includes a custom color palette and material design-inspired components
+- **Customisable**: Includes a custom color palette and material design-inspired components
 
 ## Prerequisites
 
@@ -19,16 +19,16 @@ Before setting up the project, ensure you have the following installed:
 - pip (Python package manager)
 - Git (for cloning the repository)
 - Virtualenv (for creating isolated Python environments)
-- Buildozer (for Android APK compilation, optional if not targeting Android)
+- Buildozer (for Android APK compilation, optional)
 - A compatible operating system:
   - Windows, Linux, or macOS for development and running the app
   - Linux (Ubuntu recommended) for compiling Android APKs with Buildozer
 - A webcam (for live camera input) or video files (.mp4, .avi, .mov) for analysis
 - A pretrained model (`best_model.pt`) and scaler (`scaler.pt`) for fatigue prediction
 
-For Android compilation:
+For Optional Android compilation:
 
-- Docker (optional, for Buildozer in a containerized environment)
+- Docker (optional, for Buildozer in a containerised environment)
 - Java Development Kit (JDK) (version 11 recommended)
 - Android SDK (installed via Buildozer or manually)
 - NDK (Android Native Development Kit, specific version required by Buildozer)
@@ -40,7 +40,7 @@ To avoid dependency conflicts, set up a Python virtual environment:
 1. **Clone the Repository:**
    ```bash
    git clone https://github.com/your-username/this-repository
-   cd ai-fitness-trainer
+   cd this-repository
    ```
 
 2. **Create a Virtual Environment:**
@@ -109,7 +109,7 @@ To run the AI Fitness Trainer on your local machine:
 
 2. **Run the Application:**
    ```bash
-   python run_pose_estimation.py
+   python ai_fitness_trainer.py
    ```
 
 3. **Interact with the Application:**
@@ -119,11 +119,7 @@ To run the AI Fitness Trainer on your local machine:
    - Click **Stop** to halt the capture process
    - Monitor the Fatigue Meter, Form Analysis, and Trainer Recommendations panels for real-time feedback
 
-**Log Files:**
-- The application generates a `latency_log.txt` file in the project root to record performance metrics
-- Ensure write permissions in the project directory to avoid errors
-
-## Compiling to Android APK with Buildozer
+## Compiling to Android APK with Buildozer (Optional)
 
 To compile the application into an Android APK, use Buildozer. This process requires a Linux environment (Ubuntu recommended) or a Linux-based Docker container. Follow these steps:
 
@@ -152,7 +148,7 @@ To compile the application into an Android APK, use Buildozer. This process requ
 
 ### Step 2: Create a Buildozer Spec File
 
-1. **Initialize Buildozer:**
+1. **Initialise Buildozer:**
    In the project root, run:
    ```bash
    buildozer init
@@ -242,10 +238,9 @@ COMP3932_SYNOPTIC_PROJECT/
 ├── models/
 │   ├── best_model.pt        # Pretrained LSTM model
 │   └── scaler.pt            # Pretrained scaler
-├── run_pose_estimation.py   # Main application script
+├── ai_fitness_trainer.py    # Main application script
 ├── requirements.txt         # Python dependencies
 ├── buildozer.spec           # Buildozer configuration (generated)
-├── latency_log.txt          # Runtime latency logs (generated)
 └── bin/                     # Compiled APKs (generated)
 ```
 
