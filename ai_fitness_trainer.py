@@ -949,9 +949,6 @@ class FitnessTrainerApp(MDApp):
         self.frame_latencies = []
         self.last_analysis_time = 0
         
-        # Open log file for latency measurements
-        self.log_file = open("latency_log.txt", "w")
-        
         # Reset UI feedback
         self.feedback_grid.clear_widgets()
         self.feedback_grid.add_widget(FeedbackItem(text="Waiting for posture analysis...", feedback_type="info"))
@@ -984,19 +981,11 @@ class FitnessTrainerApp(MDApp):
         self.advice_grid.add_widget(FeedbackItem(text="System ready", feedback_type="info"))
         
         self.image.texture = None
-        
-        # Close log file if open
-        if hasattr(self, 'log_file') and self.log_file:
-            self.log_file.close()
 
     def on_stop(self):
         """App cleanup on exit"""
         self.stop_capture(None)
         self.pose.close()
-        
-        # Close CSV file
-        if hasattr(self, 'csv_file') and self.csv_file:
-            self.csv_file.close()
 
 if __name__ == '__main__':
     FitnessTrainerApp().run()
